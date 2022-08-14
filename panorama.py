@@ -29,7 +29,7 @@ def readConfiguration():
         pano_base_url = 'https://{}/api/'.format(data['hostname'])
 
 
-def panorama_commit():
+def panoramaCommit():
     params = copy.copy(base_params)
     params['type'] = 'commit'
     r = etree.Element('commit')
@@ -37,16 +37,14 @@ def panorama_commit():
     resp = requests.get(pano_base_url, params=params, verify=False).content
     xml_resp = etree.fromstring(resp)
     if not xml_resp.attrib.get('status') == 'success':
-        print("Failed submit commit")
         print(resp)
-        return False
+        raise Exception("Failed to submit commit")
     msg = xml_resp.find('.//msg').text
     if msg == "There are no changes to commit.":
         print(msg)
-        return True
+        return None
     job = xml_resp.find('.//job').text
-    print('job id: {}'.format(job))
-    return True
+    return job
 
 
 def main():
