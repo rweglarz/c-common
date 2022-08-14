@@ -47,6 +47,34 @@ def panoramaCommit():
     return job
 
 
+def getJobStatus(id):
+    params = copy.copy(base_params)
+    r = etree.Element('show')
+    s = etree.SubElement(r, 'jobs')
+    s = etree.SubElement(s, 'id')
+    s.text = str(id)
+    params['cmd'] = etree.tostring(r)
+    resp = requests.get(pano_base_url, params=params, verify=False).content
+    xml_resp = etree.fromstring(resp)
+    #print(etree.tostring(xml_resp, pretty_print=True).decode())
+    return xml_resp
+
+
+def waitForJobToFinish(id):
+    if id == None:
+        print("Job is none")
+        return
+    while True:
+        js = getJobStatus(id)
+        s = js.find('./result/job/status').text
+        if s == "FIN":
+            break
+        time.sleep(5)
+    result = js.find('./result/job/result').text
+    if result == "OK":
+        print("Job: {} result: {}".format(id, result))
+
+
 def commitDevices(entries):
     params = copy.copy(base_params)
     params['type'] = 'commit'
