@@ -1,8 +1,6 @@
 #!env python3
 import argparse
 import base64
-import botocore
-import boto3
 import copy
 import json
 from lxml import etree
@@ -10,6 +8,7 @@ from lxml.builder import E
 import requests
 import re
 import sys
+import time
 
 import urllib3
 
