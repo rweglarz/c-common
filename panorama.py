@@ -47,6 +47,32 @@ def panoramaCommit():
     return job
 
 
+def getDevices(dg=None, connected=None):
+    params = copy.copy(base_params)
+    r = etree.Element('show')
+    s = etree.SubElement(r, 'devicegroups')
+    params['cmd'] = etree.tostring(r)
+    dgs = etree.fromstring(
+        requests.get(pano_base_url, params=params, verify=False).content)
+    r = {}
+    for i_dg in dgs.findall('./result/devicegroups/entry'):
+        dg_name = i_dg.get('name')
+        if dg and dg_name != dg:
+            continue
+        for i_dev in i_dg.findall('./devices/entry'):
+            serial = i_dev.find('serial').text
+            dev_connected = i_dev.find('connected').text
+            if connected == True and dev_connected == "no":
+                continue
+            if connected == False and dev_connected == "yes":
+                continue
+            print('{} {}'.format(dg_name, serial))
+            if not dg_name in r:
+                r[dg_name] = []
+            r[dg_name].append(serial)
+    return r
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='useful actions on panorama'
