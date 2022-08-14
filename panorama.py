@@ -135,10 +135,28 @@ def main():
         description='useful actions on panorama'
     )
     #parser.add_argument('--clean', action='store_true')
+    parser.add_argument('cmd')
     args = parser.parse_args()
 
     readConfiguration()
-    panorama_commit()
+    print(args.cmd)
+    if args.cmd=="commit":
+        j = panoramaCommit()
+        print("Panorama commit job: {}".format(j))
+        waitForJobToFinish(j)
+        sys.exit(0)
+    if args.cmd=="commit-all":
+        j = panoramaCommit()
+        print("Panorama commit job: {}".format(j))
+        waitForJobToFinish(j)
+        d = getDevices(connected=True)
+        print(d)
+        j = commitDevices(d)
+        print("Devices commit job: {}".format(j))
+        waitForJobToFinish(j)
+        sys.exit(0)
+    print("Unrecognized command")
+    sys.exit(1)
 
 
 if __name__ == '__main__':
