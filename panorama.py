@@ -47,6 +47,35 @@ def panoramaCommit():
     return job
 
 
+def commitDevices(entries):
+    params = copy.copy(base_params)
+    params['type'] = 'commit'
+    params['action'] = 'all'
+    r = etree.Element('commit-all')
+    sp = etree.SubElement(r, 'shared-policy')
+    it = etree.SubElement(sp, 'include-template')
+    it.text = "yes"
+    dgs = etree.SubElement(sp, 'device-group')
+    for dg in entries:
+        dge = etree.SubElement(dgs, 'entry', name=dg)
+        des = etree.SubElement(dge, 'devices')
+        for s in entries[dg]:
+            se = etree.SubElement(des, 'entry', name=s)
+    params['cmd'] = etree.tostring(r)
+    print(params['cmd'])
+    resp = requests.get(pano_base_url, params=params, verify=False).content
+    xml_resp = etree.fromstring(resp)
+    if not xml_resp.attrib.get('status') == 'success':
+        print(resp)
+        raise Exception("Failed submit commit")
+    msg = xml_resp.find('.//msg').text
+    if msg == "There are no changes to commit.":
+        print(msg)
+        return None
+    job = xml_resp.find('.//job').text
+    return job
+
+
 def getDevices(dg=None, connected=None):
     params = copy.copy(base_params)
     r = etree.Element('show')
