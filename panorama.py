@@ -20,6 +20,8 @@ base_params = {
 }
 pano_base_url = 'https://{}/api/'.format('dummy')
 
+class commitFailed(Exception):
+    pass
 
 def readConfiguration():
     global pano_base_url
@@ -73,6 +75,17 @@ def waitForJobToFinish(id):
     result = js.find('./result/job/result').text
     if result == "OK":
         print("Job: {} result: {}".format(id, result))
+        return
+    print(etree.tostring(js, pretty_print=True).decode())
+    for d in js.findall('./result/job/devices/entry'):
+        dn = d.find('./devicename').text
+        sn = d.find('./serial-no').text
+        r = d.find('./result').text
+        det_msg = ""
+        print("== {}/{} - {} - {}".format(dn, sn, r, det_msg))
+        for l in d.findall('./details/msg/errors/line'):
+            print(l.text)
+    raise commitFailed("")
 
 
 def commitDevices(entries):
