@@ -117,7 +117,32 @@ def commitDevices(entries):
     return job
 
 
-def getDevices(dg=None, connected=None):
+def getDevices(dg=None, ts=None, connected=None, in_sync=None):
+    params = copy.copy(base_params)
+    r = etree.Element('show')
+    s = etree.SubElement(r, 'template-stack')
+    params['cmd'] = etree.tostring(r)
+    tss = etree.fromstring(
+        requests.get(pano_base_url, params=params, verify=False).content)
+    ts_out_of_sync = []
+    for i_ts in tss.findall('./result/template-stack/entry'):
+        ts_name = i_ts.get('name')
+        if ts and ts_name != ts:
+            continue
+        for i_dev in i_ts.findall('./devices/entry'):
+            serial = i_dev.find('serial').text
+            dev_connected = i_dev.find('connected').text
+            template_status = i_dev.find('template-status').text
+            if connected == True and dev_connected == "no":
+                continue
+            if connected == False and dev_connected == "yes":
+                continue
+            if in_sync == True and template_status == "Out of Sync":
+                continue
+            if in_sync == False and template_status == "In Sync":
+                continue
+            ts_out_of_sync.append(serial)
+
     params = copy.copy(base_params)
     r = etree.Element('show')
     s = etree.SubElement(r, 'devicegroups')
@@ -132,9 +157,14 @@ def getDevices(dg=None, connected=None):
         for i_dev in i_dg.findall('./devices/entry'):
             serial = i_dev.find('serial').text
             dev_connected = i_dev.find('connected').text
+            policy_status = i_dev.find('shared-policy-status').text
             if connected == True and dev_connected == "no":
                 continue
             if connected == False and dev_connected == "yes":
+                continue
+            if in_sync == True and (policy_status == "Out of Sync" or serial in ts_out_of_sync):
+                continue
+            if in_sync == False and (policy_status == "In Sync" and not serial in ts_out_of_sync):
                 continue
             print('{} {}'.format(dg_name, serial))
             if not dg_name in r:
@@ -162,6 +192,12 @@ def main():
         j = panoramaCommit()
         print("Panorama commit job: {}".format(j))
         waitForJobToFinish(j)
+        d = getDevices(connected=True, in_sync=False)
+        print(d)
+        j = commitDevices(d)
+        print("Devices commit job: {}".format(j))
+        waitForJobToFinish(j)
+        sys.exit(0)
         d = getDevices(connected=True)
         print(d)
         j = commitDevices(d)
