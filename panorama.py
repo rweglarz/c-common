@@ -201,12 +201,17 @@ def main():
         print("Devices commit job: {}".format(j))
         waitForJobToFinish(j)
         sys.exit(0)
+    if args.cmd=="push-all":
         d = getDevices(connected=True)
         print(d)
         j = commitDevices(d)
         print("Devices commit job: {}".format(j))
-        waitForJobToFinish(j)
-        sys.exit(0)
+        try:
+            waitForJobToFinish(j)
+        except commitFailed:
+            sys.exit(1)
+        else:
+            sys.exit(0)
     print("Unrecognized command")
     sys.exit(1)
 
