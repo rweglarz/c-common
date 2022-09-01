@@ -89,6 +89,9 @@ def waitForJobToFinish(id):
 
 
 def commitDevices(entries):
+    if len(entries) == 0:
+        print("No devices to commit")
+        return None
     params = copy.copy(base_params)
     params['type'] = 'commit'
     params['action'] = 'all'
