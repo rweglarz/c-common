@@ -5,6 +5,7 @@ import copy
 import json
 from lxml import etree
 from lxml.builder import E
+import os
 import requests
 import re
 import sys
@@ -18,17 +19,23 @@ base_params = {
     'key': '',
     'type': 'op',
 }
+base_config = {}
 pano_base_url = 'https://{}/api/'.format('dummy')
 
 class commitFailed(Exception):
     pass
 
+
 def readConfiguration():
     global pano_base_url
-    with open("/Users/rweglarz/prog/ce-common/panorama_creds.json") as f:
+    global base_config
+
+    with open(os.path.join(os.path.expanduser("~"), "panorama_creds.json")) as f:
         data = json.load(f)
         base_params["key"] = data["api_key"]
         pano_base_url = 'https://{}/api/'.format(data['hostname'])
+    with open(os.path.join(os.path.expanduser("~"), "panorama_config.json")) as f:
+        base_config = json.load(f)
 
 
 def panoramaCommit():
