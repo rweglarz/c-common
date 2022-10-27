@@ -168,6 +168,22 @@ def commitDevices(entries):
     return job
 
 
+def getDGOfDevice(serial):
+    params = copy.copy(base_params)
+    r = etree.Element('show')
+    s = etree.SubElement(r, 'devicegroups')
+    params['cmd'] = etree.tostring(r)
+    dgs = etree.fromstring(
+        requests.get(pano_base_url, params=params, verify=False).content)
+    r = {}
+    for i_dg in dgs.findall('./result/devicegroups/entry'):
+        dg_name = i_dg.get('name')
+        for i_dev in i_dg.findall('./devices/entry'):
+            if serial == i_dev.find('serial').text:
+                return dg_name
+    return None
+
+
 def getDevices(dg=None, ts=None, connected=None, in_sync=None):
     params = copy.copy(base_params)
     r = etree.Element('show')
