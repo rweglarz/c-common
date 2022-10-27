@@ -88,6 +88,34 @@ def waitForJobToFinish(id):
     raise commitFailed("")
 
 
+def queryLogs(log_type, query):
+    params = copy.copy(base_params)
+    params['type'] = 'log'
+    params['log-type'] = log_type
+    params['dir'] = 'backward'
+    params['query'] = query
+    resp = etree.fromstring(
+        requests.get(pano_base_url, params=params, verify=False).content)
+    #print(etree.tostring(resp, pretty_print=True).decode())
+    job = resp.find('.//job').text
+    while True:
+        params = copy.copy(base_params)
+        params['type'] = 'log'
+        params['action'] = 'get'
+        params['job-id'] = job
+        resp = etree.fromstring(
+            requests.get(pano_base_url, params=params, verify=False).content)
+        status = resp.find('./result/job/status').text
+        #print('log job {} status {}'.format(job, status))
+        # just to note the active job status
+        if status=='ACT':
+            continue
+        if status=='FIN':
+            break
+        raise Exception("Unknown job status: {}, query: {}".format(status, query))
+    return resp.find('./result/log/logs')
+
+
 def commitDevices(entries):
     if len(entries) == 0:
         print("No devices to commit")
