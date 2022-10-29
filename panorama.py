@@ -144,6 +144,27 @@ def isDeviceCandidateForRemovalBasedOnHistory(logs, min_time):
     return False
 
 
+def doAPIDeleteFromConfig(params, xpath):
+    resp = etree.fromstring(
+        requests.get(pano_base_url, params=params, verify=False).content)
+    rtxt = etree.tostring(resp).decode()
+    if not resp.attrib.get('status') == 'success':
+        print(resp)
+        raise Exception("Delete operation did not succeed: {} {}".format(xpath, rtxt))
+    if resp.attrib.get('code') == '20':
+        # success, command succeeded
+        msg = resp.find('msg').text
+        if msg=="command succeeded":
+            return True
+    if resp.attrib.get('code') == '7':
+        msg = resp.find('msg').text
+        if msg=="Object doesn't exist":
+            return False
+        if msg=="No object to delete in delete handler":
+            pass
+    raise Exception("Unknown response for delete operation: {} {}".format(xpath, rtxt))
+
+
 def commitDevices(entries):
     if len(entries) == 0:
         print("No devices to commit")
