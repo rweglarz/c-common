@@ -192,6 +192,38 @@ def getDGOfDevice(serial):
     return None
 
 
+def getTSOfDevice(serial):
+    params = copy.copy(base_params)
+    r = etree.Element('show')
+    s = etree.SubElement(r, 'template-stack')
+    params['cmd'] = etree.tostring(r)
+    tss = etree.fromstring(
+        requests.get(pano_base_url, params=params, verify=False).content)
+    for i_ts in tss.findall('./result/template-stack/entry'):
+        ts_name = i_ts.get('name')
+        for i_dev in i_ts.findall('./devices/entry'):
+            if serial == i_dev.find('serial').text:
+                return ts_name
+    return None
+
+
+def getLCGOfDevice(serial):
+    params = copy.copy(base_params)
+    r = etree.Element('show')
+    s = etree.SubElement(r, 'log-collector-group')
+    s = etree.SubElement(s, 'all')
+    params['cmd'] = etree.tostring(r)
+    lcgs = etree.fromstring(
+        requests.get(pano_base_url, params=params, verify=False).content)
+    #print(etree.tostring(lcgs, pretty_print=True).decode())
+    for i_lcg in lcgs.findall('./result/log-collector-group/entry'):
+        lcg_name = i_lcg.get('name')
+        for i_dev in i_lcg.findall('./device-list/entry'):
+            if serial == i_dev.get('name'):
+                return lcg_name
+    return None
+
+
 def getDevices(dg=None, ts=None, connected=None, in_sync=None):
     params = copy.copy(base_params)
     r = etree.Element('show')
