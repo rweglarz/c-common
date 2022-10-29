@@ -212,6 +212,42 @@ def deleteDeviceFromPanoramaDevices(serial):
     return r
 
 
+def cleanupDevices(min_time, stable_dgs):
+    params = copy.copy(base_params)
+    r = etree.Element('show')
+    s = etree.SubElement(r, 'devices')
+    s = etree.SubElement(s, 'all')
+    params['cmd'] = etree.tostring(r)
+    resp = etree.fromstring(
+        requests.get(pano_base_url, params=params, verify=False).content)
+    for i_d in resp.findall('./result/devices/entry'):
+        serial = i_d.find('serial').text
+        connected = i_d.find('connected').text
+        if connected=="yes":
+            continue
+        print()
+        print("== {}".format(serial))
+        dg = getDGOfDevice(serial)
+        if dg in stable_dgs:
+            print("Do not delete {} based on dg {} membership".format(serial, dg))
+            continue
+        query = "(description contains '{} connected') or (description contains '{} disconnected') ".format(serial, serial)
+        logs = queryLogs('system', query)
+        if not isDeviceCandidateForRemovalBasedOnHistory(logs, min_time):
+            print("Not suitable for delete {}, too fresh".format(serial))
+            continue
+        ts = getTSOfDevice(serial)
+        lcg = getLCGOfDevice(serial)
+        print("Will delete {}, dg: {}, ts: {}, lcg: {}".format(serial, dg, ts, lcg))
+        if dg:
+            deleteDeviceFromDG(serial, dg)
+        if ts:
+            deleteDeviceFromTS(serial, ts)
+        if lcg:
+            deleteDeviceFromLCG(serial, lcg)
+        deleteDeviceFromPanoramaDevices(serial)
+
+
 def commitDevices(entries):
     if len(entries) == 0:
         print("No devices to commit")
@@ -384,6 +420,11 @@ def main():
             sys.exit(1)
         else:
             sys.exit(0)
+    if args.cmd=="cleanup-devices":
+        cleanupDevices(
+            base_config["min_time_for_device_removal"], 
+            base_config["permanent_device_groups"])
+        sys.exit(0)
     print("Unrecognized command")
     sys.exit(1)
 
