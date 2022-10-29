@@ -165,6 +165,53 @@ def doAPIDeleteFromConfig(params, xpath):
     raise Exception("Unknown response for delete operation: {} {}".format(xpath, rtxt))
 
 
+def deleteDeviceFromDG(serial, dg):
+    params = copy.copy(base_params)
+    params['type'] = 'config'
+    params['action'] = 'delete'
+    xpath = "/config/devices/entry[@name='localhost.localdomain']"
+    xpath+= "/device-group/entry[@name='{}']/devices/entry[@name='{}']".format(dg, serial)
+    params['xpath'] = xpath
+    r = doAPIDeleteFromConfig(params, xpath)
+    print("{} {}removed from dg {}".format(serial, "" if r else "not ", dg))
+    return r
+
+
+def deleteDeviceFromTS(serial, ts):
+    params = copy.copy(base_params)
+    params['type'] = 'config'
+    params['action'] = 'delete'
+    xpath = "/config/devices/entry[@name='localhost.localdomain']"
+    xpath+= "/template-stack/entry[@name='{}']/devices/entry[@name='{}']".format(ts, serial)
+    params['xpath'] = xpath
+    r = doAPIDeleteFromConfig(params, xpath)
+    print("{} {}removed from ts {}".format(serial, "" if r else "not ", ts))
+    return r
+
+
+def deleteDeviceFromLCG(serial, lcg):
+    params = copy.copy(base_params)
+    params['type'] = 'config'
+    params['action'] = 'delete'
+    xpath = "/config/devices/entry[@name='localhost.localdomain']"
+    xpath+= "/log-collector-group/entry[@name='{}']/logfwd-setting/devices/entry[@name='{}']".format(lcg, serial)
+    params['xpath'] = xpath
+    r = doAPIDeleteFromConfig(params, xpath)
+    print("{} {}removed from lcg {}".format(serial, "" if r else "not ", lcg))
+    return r
+
+
+def deleteDeviceFromPanoramaDevices(serial):
+    params = copy.copy(base_params)
+    params['type'] = 'config'
+    params['action'] = 'delete'
+    xpath = "/config/mgt-config/devices/entry[@name='{}']".format(serial)
+    params['xpath'] = xpath
+    r = doAPIDeleteFromConfig(params, xpath)
+    print("{} {}removed from panorama device list".format(serial, "" if r else "not "))
+    return r
+
+
 def commitDevices(entries):
     if len(entries) == 0:
         print("No devices to commit")
