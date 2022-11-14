@@ -212,6 +212,53 @@ def deleteDeviceFromPanoramaDevices(serial):
     return r
 
 
+def enableAutoContentPushOnTS(ts):
+    params = copy.copy(base_params)
+    params['type'] = 'config'
+    params['action'] = 'set'
+    xpath = "/config/devices/entry[@name='localhost.localdomain']"
+    xpath+= "/template-stack/entry[@name='{}']".format(ts)
+    params['xpath'] = xpath
+    r = etree.Element('auto-push-on-1st-conn')
+    r.text = "yes"
+    params['element'] = etree.tostring(r)
+    resp = etree.fromstring(
+        requests.get(pano_base_url, params=params, verify=False).content)
+    rtxt = etree.tostring(resp).decode()
+    if not resp.attrib.get('status') == 'success':
+        print(resp)
+        raise Exception("Delete operation did not succeed: {} {}".format(xpath, rtxt))
+    if resp.attrib.get('code') == '20':
+        # success, command succeeded
+        msg = resp.find('msg').text
+        if msg=="command succeeded":
+            return True
+    raise Exception("Unknown response for delete operation: {} {}".format(xpath, rtxt))
+
+
+def enableAutoContentPush():
+    params = copy.copy(base_params)
+    params['type'] = 'config'
+    params['action'] = 'get'
+    xpath = "/config/devices/entry[@name='localhost.localdomain']"
+    xpath+= "/template-stack"
+    params['xpath'] = xpath
+    tss = etree.fromstring(
+        requests.get(pano_base_url, params=params, verify=False).content)
+    for i_ts in tss.findall('./result/template-stack/entry'):
+        ts_name = i_ts.get('name')
+        desc_n = i_ts.find('description')
+        if desc_n is None:
+            continue
+        if not 'pat:acp' in desc_n.text:
+            continue
+        auto_push_n = i_ts.find('auto-push-on-1st-conn')
+        if auto_push_n is not None and auto_push_n.text=="yes":
+            continue
+        print("Enabling auto content push on: {}".format(ts_name))
+        enableAutoContentPushOnTS(ts_name)
+
+
 def cleanupDevices(min_time, stable_dgs):
     params = copy.copy(base_params)
     r = etree.Element('show')
@@ -400,6 +447,7 @@ def main():
         waitForJobToFinish(j)
         sys.exit(0)
     if args.cmd=="commit-all":
+        enableAutoContentPush()
         j = panoramaCommit()
         print("Panorama commit job: {}".format(j))
         waitForJobToFinish(j)
@@ -424,6 +472,9 @@ def main():
         cleanupDevices(
             base_config["min_time_for_device_removal"], 
             base_config["permanent_device_groups"])
+        sys.exit(0)
+    if args.cmd=="enable-auto-content-push":
+        enableAutoContentPush()
         sys.exit(0)
     print("Unrecognized command")
     sys.exit(1)
