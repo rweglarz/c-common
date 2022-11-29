@@ -284,7 +284,7 @@ def cleanupDevices(min_time, stable_dgs):
         if not isDeviceCandidateForRemovalBasedOnHistory(logs, min_time):
             print("Not suitable for delete {}, too fresh".format(serial))
             continue
-        ts = getTSOfDevice(serial)
+        ts = getTSOfDeviceFromConfig(serial)
         lcg = getLCGOfDevice(serial)
         print("Will delete {}, dg: {}, ts: {}, lcg: {}".format(serial, dg, ts, lcg))
         if dg:
@@ -355,6 +355,24 @@ def getTSOfDevice(serial):
         ts_name = i_ts.get('name')
         for i_dev in i_ts.findall('./devices/entry'):
             if serial == i_dev.find('serial').text:
+                return ts_name
+    return None
+
+
+def getTSOfDeviceFromConfig(serial):
+    params = copy.copy(base_params)
+    params['type'] = 'config'
+    params['action'] = 'get'
+    xpath = "/config/devices/entry[@name='localhost.localdomain']"
+    xpath+= "/template-stack"
+    params['xpath'] = xpath
+    tss = etree.fromstring(
+        requests.get(pano_base_url, params=params, verify=False).content)
+    for i_ts in tss.findall('./result/template-stack/entry'):
+        ts_name = i_ts.get('name')
+        for i_dev in i_ts.findall('./devices/entry'):
+            s = i_dev.get('name')
+            if s==serial:
                 return ts_name
     return None
 
