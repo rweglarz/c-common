@@ -270,10 +270,11 @@ def cleanupDevices(min_time, stable_dgs):
     for i_d in resp.findall('./result/devices/entry'):
         serial = i_d.find('serial').text
         connected = i_d.find('connected').text
-        if connected=="yes":
-            continue
         print()
         print("== {}".format(serial))
+        if connected=="yes":
+            print("Not suitable for delete {}, still connected".format(serial))
+            continue
         dg = getDGOfDevice(serial)
         if dg in stable_dgs:
             print("Do not delete {} based on dg {} membership".format(serial, dg))
