@@ -165,6 +165,39 @@ def doAPIDeleteFromConfig(params, xpath):
     raise Exception("Unknown response for delete operation: {} {}".format(xpath, rtxt))
 
 
+def testXMLAESubinterface():
+    params = copy.copy(base_params)
+    params['type'] = 'config'
+    params['action'] = 'get'
+    xpath = "/config/devices/entry[@name='localhost.localdomain']"
+    xpath+= "/template/entry[@name='{}']/config/devices".format("apitest")
+    xpath+= "/entry[@name='localhost.localdomain']/network/interface"
+    xpath+= "/aggregate-ethernet/entry[@name='{}']".format("ae1")
+    params['xpath'] = xpath
+    resp = etree.fromstring(
+        requests.get(pano_base_url, params=params, verify=False).content)
+    print(etree.tostring(resp, pretty_print=True).decode())
+    rtxt = etree.tostring(resp).decode()
+
+    params = copy.copy(base_params)
+    params['type'] = 'config'
+    params['action'] = 'set'
+    xpath+= "/layer3/units"
+    params['xpath'] = xpath
+    r = etree.Element('entry')
+    r.attrib["name"] = "ae1.20"
+    ips = etree.SubElement(r, 'ip')
+    ip = etree.SubElement(ips, 'entry')
+    ip.attrib["name"] = "2.2.2.20/32"
+    tag = etree.SubElement(r, 'tag')
+    tag.text = "20"
+    params['element'] = etree.tostring(r)
+    resp = etree.fromstring(
+        requests.get(pano_base_url, params=params, verify=False).content)
+    print(etree.tostring(resp, pretty_print=True).decode())
+    return
+
+
 def deleteDeviceFromDG(serial, dg):
     params = copy.copy(base_params)
     params['type'] = 'config'
@@ -494,6 +527,9 @@ def main():
         sys.exit(0)
     if args.cmd=="enable-auto-content-push":
         enableAutoContentPush()
+        sys.exit(0)
+    if args.cmd=="test-xml-ae-subinterface":
+        testXMLAESubinterface()
         sys.exit(0)
     print("Unrecognized command")
     sys.exit(1)
