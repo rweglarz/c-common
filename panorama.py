@@ -292,6 +292,20 @@ def enableAutoContentPush():
         enableAutoContentPushOnTS(ts_name)
 
 
+def cleanupSingleDevice(serial):
+    dg = getDGOfDevice(serial)
+    ts = getTSOfDeviceFromConfig(serial)
+    lcg = getLCGOfDevice(serial)
+    print("Will delete {}, dg: {}, ts: {}, lcg: {}".format(serial, dg, ts, lcg))
+    if dg:
+        deleteDeviceFromDG(serial, dg)
+    if ts:
+        deleteDeviceFromTS(serial, ts)
+    if lcg:
+        deleteDeviceFromLCG(serial, lcg)
+    deleteDeviceFromPanoramaDevices(serial)
+
+
 def cleanupDevices(min_time, stable_dgs):
     params = copy.copy(base_params)
     r = etree.Element('show')
@@ -488,6 +502,7 @@ def main():
         description='useful actions on panorama'
     )
     #parser.add_argument('--clean', action='store_true')
+    parser.add_argument('--serial', nargs='?', action='store')
     parser.add_argument('cmd')
     args = parser.parse_args()
 
@@ -524,6 +539,9 @@ def main():
         cleanupDevices(
             base_config["min_time_for_device_removal"], 
             base_config["permanent_device_groups"])
+        sys.exit(0)
+    if args.cmd=="cleanup-single-device":
+        cleanupSingleDevice(args.serial)
         sys.exit(0)
     if args.cmd=="enable-auto-content-push":
         enableAutoContentPush()
