@@ -1,0 +1,5 @@
+variable "peers" {
+}
+
+variable "psk" {
+}
