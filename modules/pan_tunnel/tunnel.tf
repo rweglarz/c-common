@@ -33,6 +33,8 @@ resource "panos_panorama_ike_gateway" "this" {
   enable_dead_peer_detection   = true
   dead_peer_detection_interval = 2
   dead_peer_detection_retry    = 5
+  enable_liveness_check        = true
+  liveness_check_interval      = 10
 }
 
 
@@ -46,6 +48,11 @@ resource "panos_panorama_ipsec_tunnel" "this" {
   ak_ike_gateway   = local.peer[each.key].name
 
   anti_replay = false
+
+  enable_tunnel_monitor = lookup(each.value, "enable_tunnel_monitor", false)
+  tunnel_monitor_destination_ip  = lookup(each.value, "tunnel_monitor_destination_ip", null)
+  #tunnel_monitor_source_ip - (Optional) Source IP to send ICMP probe
+  tunnel_monitor_profile = "fail-over"
 
   depends_on = [
     panos_panorama_ike_gateway.this
