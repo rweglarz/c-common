@@ -11,8 +11,9 @@ resource "panos_panorama_ike_gateway" "this" {
   template = each.value.template
   name     = local.peer[each.key].name
 
-  peer_ip_type  = "ip"
-  peer_ip_value = local.peer[each.key].ip
+  #this can be overriden by local values
+  peer_ip_type  = lookup(each.value, "peer_ip_type", "ip")
+  peer_ip_value = lookup(each.value, "peer_ip_value", local.peer[each.key].ip)
 
   interface      = each.value.interface.phys
   pre_shared_key = var.psk
