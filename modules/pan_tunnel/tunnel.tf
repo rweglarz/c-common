@@ -6,7 +6,7 @@ locals {
 }
 
 resource "panos_panorama_ike_gateway" "this" {
-  for_each = var.peers
+  for_each = { for k, v in var.peers : k => v if lookup(v, "do_not_configure", false) == false }
 
   template = each.value.template
   name     = local.peer[each.key].name
@@ -28,6 +28,8 @@ resource "panos_panorama_ike_gateway" "this" {
   nat_traversal_keep_alive          = 10
   nat_traversal_enable_udp_checksum = true
 
+  enable_passive_mode = lookup(each.value, "enable_passive_mode", false)
+
   enable_dead_peer_detection   = true
   dead_peer_detection_interval = 2
   dead_peer_detection_retry    = 5
@@ -35,7 +37,7 @@ resource "panos_panorama_ike_gateway" "this" {
 
 
 resource "panos_panorama_ipsec_tunnel" "this" {
-  for_each = var.peers
+  for_each = { for k, v in var.peers : k => v if lookup(v, "do_not_configure", false) == false }
 
   template = each.value.template
   name     = local.peer[each.key].name
