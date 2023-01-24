@@ -543,6 +543,9 @@ def main():
     if args.cmd=="cleanup-single-device":
         cleanupSingleDevice(args.serial)
         sys.exit(0)
+    if args.cmd=="list-devices":
+        print(getDevices())
+        sys.exit(0)
     if args.cmd=="enable-auto-content-push":
         enableAutoContentPush()
         sys.exit(0)
