@@ -2,6 +2,12 @@ resource "panos_panorama_template" "this" {
   name = var.name
 }
 
+resource "panos_panorama_management_profile" "ping" {
+  template = panos_panorama_template.this.name
+
+  name = "ping"
+  ping = true
+}
 
 resource "panos_panorama_ethernet_interface" "this" {
   for_each = { for k, v in var.interfaces : k => v if length(regexall("^eth", k)) > 0 }
@@ -15,6 +21,7 @@ resource "panos_panorama_ethernet_interface" "this" {
   enable_dhcp               = lookup(each.value, "enable_dhcp", false)
   create_dhcp_default_route = lookup(each.value, "create_dhcp_default_route", false)
 
+  management_profile = panos_panorama_management_profile.ping.name
 }
 
 resource "panos_panorama_tunnel_interface" "this" {
@@ -25,6 +32,8 @@ resource "panos_panorama_tunnel_interface" "this" {
   vsys = "vsys1"
 
   static_ips = lookup(each.value, "static_ips", [])
+
+  management_profile = panos_panorama_management_profile.ping.name
 }
 
 resource "panos_panorama_loopback_interface" "this" {
@@ -34,6 +43,8 @@ resource "panos_panorama_loopback_interface" "this" {
   name = each.key
 
   static_ips = lookup(each.value, "static_ips", [])
+
+  management_profile = panos_panorama_management_profile.ping.name
 }
 
 locals {
@@ -93,4 +104,12 @@ resource "panos_panorama_static_route_ipv4" "aws-vr1-tun10" {
     panos_panorama_loopback_interface.this,
     panos_virtual_router.this,
   ]
+}
+
+resource "panos_panorama_monitor_profile" "this" {
+  template  = panos_panorama_template.this.name
+  name      = "fail-over"
+  interval  = 5
+  threshold = 3
+  action    = "fail-over"
 }
