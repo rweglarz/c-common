@@ -307,6 +307,7 @@ def cleanupSingleDevice(serial):
 
 
 def cleanupDevices(min_time, stable_dgs):
+    delicense_jobs = []
     params = copy.copy(base_params)
     r = etree.Element('show')
     s = etree.SubElement(r, 'devices')
@@ -325,6 +326,8 @@ def cleanupDevices(min_time, stable_dgs):
             continue
         if serial in lic_devs:
             print("Needs to be delicensed first {}".format(lic_devs[serial]))
+            job = delicenseFirewallFromPanorama(serial)
+            delicense_jobs.append(job)
             continue
         dg = getDGOfDevice(serial)
         if dg in stable_dgs:
@@ -345,6 +348,7 @@ def cleanupDevices(min_time, stable_dgs):
         if lcg:
             deleteDeviceFromLCG(serial, lcg)
         deleteDeviceFromPanoramaDevices(serial)
+    return delicense_jobs
 
 
 def commitDevices(entries):
@@ -519,6 +523,28 @@ def getSupportPortalLicensedDevices(authcode):
         devices[sn] = d
     return devices
 
+def delicenseFirewallFromPanorama(serial):
+    # request batch license deactivate VM-Capacity devices 007957000352464 mode auto
+    params = copy.copy(base_params)
+    r = etree.Element('request')
+    s = etree.SubElement(r, 'batch')
+    s = etree.SubElement(s, 'license')
+    s = etree.SubElement(s, 'deactivate')
+    v = etree.SubElement(s, 'VM-Capacity')
+    s = etree.SubElement(v, 'devices')
+    s.text = serial
+    s = etree.SubElement(v, 'mode')
+    s.text = 'auto'
+    params['cmd'] = etree.tostring(r)
+    resp = requests.get(pano_base_url, params=params, verify=False).content
+    xml_resp = etree.fromstring(resp)
+    if not xml_resp.attrib.get('status') == 'success':
+        print(resp)
+        raise Exception("Failed to request delicense for {}".format(serial))
+    job = xml_resp.find('.//job').text
+    print("Delicense job {} triggered for {}".format(job, serial))
+    return job
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -559,9 +585,17 @@ def main():
         else:
             sys.exit(0)
     if args.cmd=="cleanup-devices":
-        cleanupDevices(
-            base_config["min_time_for_device_removal"], 
-            base_config["permanent_device_groups"])
+        delicense_jobs = cleanupDevices(
+            base_config["min_time_for_device_removal"],
+            base_config["permanent_device_groups"],
+        )
+        for job in delicense_jobs:
+            waitForJobToFinish(job)
+        if len(delicense_jobs)>0:
+            cleanupDevices(
+                base_config["min_time_for_device_removal"],
+                base_config["permanent_device_groups"],
+            )
         sys.exit(0)
     if args.cmd=="cleanup-single-device":
         cleanupSingleDevice(args.serial)
