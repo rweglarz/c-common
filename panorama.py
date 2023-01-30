@@ -314,6 +314,7 @@ def cleanupDevices(min_time, stable_dgs):
     params['cmd'] = etree.tostring(r)
     resp = etree.fromstring(
         requests.get(pano_base_url, params=params, verify=False).content)
+    lic_devs = getSupportPortalLicensedDevices(None)
     for i_d in resp.findall('./result/devices/entry'):
         serial = i_d.find('serial').text
         connected = i_d.find('connected').text
@@ -321,6 +322,9 @@ def cleanupDevices(min_time, stable_dgs):
         print("== {}".format(serial))
         if connected=="yes":
             print("Not suitable for delete {}, still connected".format(serial))
+            continue
+        if serial in lic_devs:
+            print("Needs to be delicensed first {}".format(lic_devs[serial]))
             continue
         dg = getDGOfDevice(serial)
         if dg in stable_dgs:
@@ -496,6 +500,25 @@ def getDevices(dg=None, ts=None, connected=None, in_sync=None):
             r[dg_name].append(serial)
     return r
 
+def getSupportPortalLicensedDevices(authcode):
+    url = "https://api.paloaltonetworks.com/api/license/get"
+    api_key = base_config["license"]["api_key"]
+    if authcode is None:
+        authcode = base_config["license"]["authcode"]
+    headers = {
+        "apikey": api_key
+    }
+    data = {
+        "authcode": authcode
+    }
+    devices = {}
+    resp = requests.post(url, data=data, headers=headers, verify=False).content
+    devs = json.loads(resp)
+    for d in devs['UsedDeviceDetails']:
+        sn = d.get('SerialNumber')
+        devices[sn] = d
+    return devices
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -545,6 +568,11 @@ def main():
         sys.exit(0)
     if args.cmd=="list-devices":
         print(getDevices())
+        sys.exit(0)
+    if args.cmd=="list-licensed-devices":
+        devs = getSupportPortalLicensedDevices(None)
+        for d in devs:
+            print("{} {}".format(d, devs[d]))
         sys.exit(0)
     if args.cmd=="enable-auto-content-push":
         enableAutoContentPush()
