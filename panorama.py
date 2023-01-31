@@ -324,11 +324,6 @@ def cleanupDevices(min_time, stable_dgs):
         if connected=="yes":
             print("Not suitable for delete {}, still connected".format(serial))
             continue
-        if serial in lic_devs:
-            print("Needs to be delicensed first {}".format(lic_devs[serial]))
-            job = delicenseFirewallFromPanorama(serial)
-            delicense_jobs.append(job)
-            continue
         dg = getDGOfDevice(serial)
         if dg in stable_dgs:
             print("Do not delete {} based on dg {} membership".format(serial, dg))
@@ -337,6 +332,11 @@ def cleanupDevices(min_time, stable_dgs):
         logs = queryLogs('system', query)
         if not isDeviceCandidateForRemovalBasedOnHistory(logs, min_time):
             print("Not suitable for delete {}, too fresh".format(serial))
+            continue
+        if serial in lic_devs:
+            print("Needs to be delicensed first {}".format(lic_devs[serial]))
+            job = delicenseFirewallFromPanorama(serial)
+            delicense_jobs.append(job)
             continue
         ts = getTSOfDeviceFromConfig(serial)
         lcg = getLCGOfDevice(serial)
@@ -590,6 +590,7 @@ def main():
             base_config["permanent_device_groups"],
         )
         for job in delicense_jobs:
+            print("Waiting for {} job to complete".format(job))
             waitForJobToFinish(job)
         if len(delicense_jobs)>0:
             cleanupDevices(
