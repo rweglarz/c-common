@@ -306,7 +306,7 @@ def cleanupSingleDevice(serial):
     deleteDeviceFromPanoramaDevices(serial)
 
 
-def cleanupDevices(min_time, stable_dgs):
+def cleanupDevices(min_time, stable_dgs, todo_dg=None):
     delicense_jobs = []
     params = copy.copy(base_params)
     r = etree.Element('show')
@@ -328,11 +328,15 @@ def cleanupDevices(min_time, stable_dgs):
         if dg in stable_dgs:
             print("Do not delete {} based on dg {} membership".format(serial, dg))
             continue
-        query = "(description contains '{} connected') or (description contains '{} disconnected') ".format(serial, serial)
-        logs = queryLogs('system', query)
-        if not isDeviceCandidateForRemovalBasedOnHistory(logs, min_time):
-            print("Not suitable for delete {}, too fresh".format(serial))
+        if todo_dg is not None and dg!=todo_dg:
+            print("Do not delete {} different dg {}".format(serial, dg))
             continue
+        if todo_dg is None:
+            query = "(description contains '{} connected') or (description contains '{} disconnected') ".format(serial, serial)
+            logs = queryLogs('system', query)
+            if not isDeviceCandidateForRemovalBasedOnHistory(logs, min_time):
+                print("Not suitable for delete {}, too fresh".format(serial))
+                continue
         if serial in lic_devs:
             print("Needs to be delicensed first {}".format(lic_devs[serial]))
             job = delicenseFirewallFromPanorama(serial)
@@ -552,6 +556,7 @@ def main():
     )
     #parser.add_argument('--clean', action='store_true')
     parser.add_argument('--serial', nargs='?', action='store')
+    parser.add_argument('--device-group', nargs='?', action='store')
     parser.add_argument('cmd')
     args = parser.parse_args()
 
@@ -588,6 +593,7 @@ def main():
         delicense_jobs = cleanupDevices(
             base_config["min_time_for_device_removal"],
             base_config["permanent_device_groups"],
+            todo_dg=args.device_group,
         )
         for job in delicense_jobs:
             print("Waiting for {} job to complete".format(job))
@@ -596,6 +602,7 @@ def main():
             cleanupDevices(
                 base_config["min_time_for_device_removal"],
                 base_config["permanent_device_groups"],
+                todo_dg=args.device_group,
             )
         sys.exit(0)
     if args.cmd=="cleanup-single-device":
