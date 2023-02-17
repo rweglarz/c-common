@@ -26,6 +26,9 @@ pano_base_url = 'https://{}/api/'.format('dummy')
 class commitFailed(Exception):
     pass
 
+class jobNotFound(Exception):
+    pass
+
 
 def readConfiguration():
     global pano_base_url
@@ -76,6 +79,11 @@ def waitForJobToFinish(id):
         return
     while True:
         js = getJobStatus(id)
+        if js.attrib.get('code') == '7':
+            for l in js.findall('./msg/line'):
+                if re.match(r'job \d+ not found', l.text):
+                    raise jobNotFound("")
+            raise Exception("unknown error")
         s = js.find('./result/job/status').text
         if s == "FIN":
             break
