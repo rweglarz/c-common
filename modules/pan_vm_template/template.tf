@@ -9,6 +9,19 @@ resource "panos_panorama_management_profile" "ping" {
   ping = true
 }
 
+resource "panos_panorama_management_profile" "hc_azure" {
+  template = panos_panorama_template.this.name
+
+  name  = "hc-azure"
+  ping  = true
+  https = true
+  permitted_ips = [
+    "168.63.129.16/32",
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+  ]
+}
+
 resource "panos_panorama_ethernet_interface" "this" {
   for_each = { for k, v in var.interfaces : k => v if length(regexall("^eth", k)) > 0 }
   template = panos_panorama_template.this.name
@@ -21,7 +34,7 @@ resource "panos_panorama_ethernet_interface" "this" {
   enable_dhcp               = lookup(each.value, "enable_dhcp", false)
   create_dhcp_default_route = lookup(each.value, "create_dhcp_default_route", false)
 
-  management_profile = panos_panorama_management_profile.ping.name
+  management_profile = lookup(each.value, "management_profile", panos_panorama_management_profile.ping.name)
 }
 
 resource "panos_panorama_tunnel_interface" "this" {
@@ -87,7 +100,7 @@ resource "panos_virtual_router" "this" {
 }
 
 
-resource "panos_panorama_static_route_ipv4" "aws-vr1-tun10" {
+resource "panos_panorama_static_route_ipv4" "this" {
   for_each = var.routes
   template = panos_panorama_template.this.name
 
