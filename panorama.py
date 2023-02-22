@@ -300,21 +300,7 @@ def enableAutoContentPush():
         enableAutoContentPushOnTS(ts_name)
 
 
-def cleanupSingleDevice(serial):
-    dg = getDGOfDevice(serial)
-    ts = getTSOfDeviceFromConfig(serial)
-    lcg = getLCGOfDevice(serial)
-    print("Will delete {}, dg: {}, ts: {}, lcg: {}".format(serial, dg, ts, lcg))
-    if dg:
-        deleteDeviceFromDG(serial, dg)
-    if ts:
-        deleteDeviceFromTS(serial, ts)
-    if lcg:
-        deleteDeviceFromLCG(serial, lcg)
-    deleteDeviceFromPanoramaDevices(serial)
-
-
-def cleanupDevices(min_time, stable_dgs, todo_dg=None):
+def cleanupDevices(min_time, stable_dgs, todo_dg=None, todo_serial=None):
     delicense_jobs = []
     params = copy.copy(base_params)
     r = etree.Element('show')
@@ -329,7 +315,10 @@ def cleanupDevices(min_time, stable_dgs, todo_dg=None):
         connected = i_d.find('connected').text
         print()
         print("== {}".format(serial))
-        if connected=="yes":
+        if todo_serial is not None and todo_serial!=serial:
+            print("Not a match by serial".format(serial))
+            continue
+        if todo_serial is None and connected=="yes":
             print("Not suitable for delete {}, still connected".format(serial))
             continue
         dg = getDGOfDevice(serial)
@@ -339,7 +328,7 @@ def cleanupDevices(min_time, stable_dgs, todo_dg=None):
         if todo_dg is not None and dg!=todo_dg:
             print("Do not delete {} different dg {}".format(serial, dg))
             continue
-        if todo_dg is None:
+        if todo_dg is None and todo_serial is None:
             query = "(description contains '{} connected') or (description contains '{} disconnected') ".format(serial, serial)
             logs = queryLogs('system', query)
             if not isDeviceCandidateForRemovalBasedOnHistory(logs, min_time):
@@ -602,6 +591,7 @@ def main():
             base_config["min_time_for_device_removal"],
             base_config["permanent_device_groups"],
             todo_dg=args.device_group,
+            todo_serial=args.serial,
         )
         for job in delicense_jobs:
             print("Waiting for {} job to complete".format(job))
@@ -611,10 +601,8 @@ def main():
                 base_config["min_time_for_device_removal"],
                 base_config["permanent_device_groups"],
                 todo_dg=args.device_group,
+                todo_serial=args.serial,
             )
-        sys.exit(0)
-    if args.cmd=="cleanup-single-device":
-        cleanupSingleDevice(args.serial)
         sys.exit(0)
     if args.cmd=="list-devices":
         print(getDevices())
