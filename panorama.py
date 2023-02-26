@@ -650,6 +650,19 @@ def main():
     if args.cmd=="unregister-ip-tag":
         ipTagMapping("unregister", "192.168.1.1", "malicious")
         sys.exit(0)
+    if args.cmd=="query-traffic-logs":
+        logs = queryLogs('traffic', "!( rule eq 'inbound appgw' ) and (receive_time in last-hour)")
+        for e in logs.findall('./entry'):
+            #print(etree.tostring(e, pretty_print=True).decode())
+            print("{:12}->{:12}:{:4} {:10} {:12}={}".format(
+                e.find('src').text, 
+                e.find('dst').text, 
+                e.find('dport').text,
+                e.find('app').text,
+                e.find('action').text,
+                e.find('rule').text
+            ))
+        sys.exit(0)
     print("Unrecognized command")
     sys.exit(1)
 
