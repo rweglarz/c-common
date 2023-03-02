@@ -57,7 +57,7 @@ resource "panos_panorama_loopback_interface" "this" {
 
   static_ips = lookup(each.value, "static_ips", [])
 
-  management_profile = panos_panorama_management_profile.ping.name
+  management_profile = lookup(each.value, "management_profile", panos_panorama_management_profile.ping.name)
 }
 
 locals {
