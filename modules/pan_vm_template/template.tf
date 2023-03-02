@@ -126,3 +126,11 @@ resource "panos_panorama_monitor_profile" "this" {
   threshold = 3
   action    = "fail-over"
 }
+
+resource "panos_panorama_template_variable" "this" {
+  for_each = var.variables
+  template = panos_panorama_template.this.name
+  name     = "${"$"}${each.key}"
+  type     = "ip-netmask"
+  value    = each.value
+}
