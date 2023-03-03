@@ -580,6 +580,7 @@ def main():
     #parser.add_argument('--clean', action='store_true')
     parser.add_argument('--serial', nargs='?', action='store')
     parser.add_argument('--device-group', nargs='?', action='store')
+    parser.add_argument('--not-on-panorama', action='store_true')
     parser.add_argument('cmd')
     args = parser.parse_args()
 
@@ -634,9 +635,18 @@ def main():
         print(getDevices())
         sys.exit(0)
     if args.cmd=="list-licensed-devices":
-        devs = getSupportPortalLicensedDevices(None)
-        for d in devs:
-            print("{} {}".format(d, devs[d]))
+        lic_devs = getSupportPortalLicensedDevices(None)
+        serials = []
+        if args.not_on_panorama:
+            pan_devs = getDevices()
+            for s in pan_devs.values():
+                serials+= s
+        for s in lic_devs:
+            if args.not_on_panorama:
+                if s not in serials:
+                    print("{} {}".format(s, lic_devs[s]))
+            else:
+                print("{} {}".format(s, lic_devs[s]))
         sys.exit(0)
     if args.cmd=="enable-auto-content-push":
         enableAutoContentPush()
