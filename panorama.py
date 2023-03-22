@@ -385,12 +385,14 @@ def commitDevices(entries):
 
 
 def getDGOfDevice(serial):
-    params = copy.copy(base_params)
-    r = etree.Element('show')
-    s = etree.SubElement(r, 'devicegroups')
-    params['cmd'] = etree.tostring(r)
-    dgs = etree.fromstring(
-        requests.get(pano_base_url, params=params, verify=False).content)
+    if not hasattr(getDGOfDevice, "dgs"):
+        params = copy.copy(base_params)
+        r = etree.Element('show')
+        s = etree.SubElement(r, 'devicegroups')
+        params['cmd'] = etree.tostring(r)
+        getDGOfDevice.dgs = etree.fromstring(
+            requests.get(pano_base_url, params=params, verify=False).content)
+    dgs = getDGOfDevice.dgs
     r = {}
     for i_dg in dgs.findall('./result/devicegroups/entry'):
         dg_name = i_dg.get('name')
@@ -401,12 +403,14 @@ def getDGOfDevice(serial):
 
 
 def getTSOfDevice(serial):
-    params = copy.copy(base_params)
-    r = etree.Element('show')
-    s = etree.SubElement(r, 'template-stack')
-    params['cmd'] = etree.tostring(r)
-    tss = etree.fromstring(
-        requests.get(pano_base_url, params=params, verify=False).content)
+    if not hasattr(getTSOfDevice, "tss"):
+        params = copy.copy(base_params)
+        r = etree.Element('show')
+        s = etree.SubElement(r, 'template-stack')
+        params['cmd'] = etree.tostring(r)
+        getTSOfDevice.tss = etree.fromstring(
+            requests.get(pano_base_url, params=params, verify=False).content)
+    tss = getTSOfDevice.tss
     for i_ts in tss.findall('./result/template-stack/entry'):
         ts_name = i_ts.get('name')
         for i_dev in i_ts.findall('./devices/entry'):
@@ -434,14 +438,16 @@ def getTSOfDeviceFromConfig(serial):
 
 
 def getLCGOfDevice(serial):
-    params = copy.copy(base_params)
-    r = etree.Element('show')
-    s = etree.SubElement(r, 'log-collector-group')
-    s = etree.SubElement(s, 'all')
-    params['cmd'] = etree.tostring(r)
-    lcgs = etree.fromstring(
-        requests.get(pano_base_url, params=params, verify=False).content)
+    if not hasattr(getLCGOfDevice, "lcgs"):
+        params = copy.copy(base_params)
+        r = etree.Element('show')
+        s = etree.SubElement(r, 'log-collector-group')
+        s = etree.SubElement(s, 'all')
+        params['cmd'] = etree.tostring(r)
+        getLCGOfDevice.lcgs = etree.fromstring(
+            requests.get(pano_base_url, params=params, verify=False).content)
     #print(etree.tostring(lcgs, pretty_print=True).decode())
+    lcgs = getLCGOfDevice.lcgs
     for i_lcg in lcgs.findall('./result/log-collector-group/entry'):
         lcg_name = i_lcg.get('name')
         for i_dev in i_lcg.findall('./device-list/entry'):
