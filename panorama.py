@@ -456,7 +456,7 @@ def getLCGOfDevice(serial):
     return None
 
 
-def getDevices(dg=None, ts=None, connected=None, in_sync=None):
+def getDevicesForCommit(dg=None, ts=None, connected=None, in_sync=None):
     params = copy.copy(base_params)
     r = etree.Element('show')
     s = etree.SubElement(r, 'template-stack')
@@ -602,14 +602,14 @@ def main():
         j = panoramaCommit()
         print("Panorama commit job: {}".format(j))
         waitForJobToFinish(j)
-        d = getDevices(connected=True, in_sync=False)
+        d = getDevicesForCommit(connected=True, in_sync=False)
         print(d)
         j = commitDevices(d)
         print("Devices commit job: {}".format(j))
         waitForJobToFinish(j)
         sys.exit(0)
     if args.cmd=="push-all":
-        d = getDevices(connected=True)
+        d = getDevicesForCommit(connected=True)
         print(d)
         j = commitDevices(d)
         print("Devices commit job: {}".format(j))
@@ -644,7 +644,7 @@ def main():
         lic_devs = getSupportPortalLicensedDevices(None)
         serials = []
         if args.not_on_panorama:
-            pan_devs = getDevices()
+            pan_devs = getDevicesForCommit()
             for s in pan_devs.values():
                 serials+= s
         for s in lic_devs:
