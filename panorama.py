@@ -6,10 +6,12 @@ import datetime
 import json
 from lxml import etree
 from lxml.builder import E
+import operator
 import os
 import requests
 import re
 import sys
+from tabulate import tabulate
 import time
 
 import urllib3
@@ -456,6 +458,60 @@ def getLCGOfDevice(serial):
     return None
 
 
+def getDevices():
+    params = copy.copy(base_params)
+    qr = etree.Element('show')
+    qd = etree.SubElement(qr, 'devices')
+    qs = etree.SubElement(qd, 'all')
+    params['cmd'] = etree.tostring(qr)
+    xdevs = etree.fromstring(
+        requests.get(pano_base_url, params=params, verify=False).content)
+    #print(etree.tostring(xdevs, pretty_print=True).decode())
+    devs = {}
+    for i_d in xdevs.findall('./result/devices/entry'):
+        serial = i_d.find('serial').text
+        devs[serial] = {}
+        d = devs[serial]
+        d['serial'] = serial
+        d['hostname'] = i_d.find('hostname').text
+        d['ip'] = i_d.find('ip-address').text
+        d['connected'] = i_d.find('connected').text
+        d['sw-version']= i_d.find('sw-version').text
+        dg = getDGOfDevice(serial)
+        ts = getTSOfDevice(serial)
+        if dg is None: 
+            dg = "-"
+        if ts is None:
+            ts = "-" 
+        d['dg'] = dg
+        d['ts'] = ts
+    return devs
+
+def printDevices():
+    devs = getDevices()
+    headers = [
+        'hostname',
+        'ip',
+        'serial',
+        'dg',
+        'ts',
+        'connected',
+        'sw',
+    ]
+    tdevs = []
+    for d in devs.values():
+        tdevs.append([
+            d['hostname'],
+            d['ip'], 
+            d['serial'], 
+            d['dg'], 
+            d['ts'], 
+            d['connected'],
+            d['sw-version'],
+        ])
+    print(tabulate(sorted(tdevs, key=operator.itemgetter(2)), headers=headers))
+
+
 def getDevicesForCommit(dg=None, ts=None, connected=None, in_sync=None):
     params = copy.copy(base_params)
     r = etree.Element('show')
@@ -638,7 +694,7 @@ def main():
             )
         sys.exit(0)
     if args.cmd=="list-devices":
-        print(getDevices())
+        printDevices()
         sys.exit(0)
     if args.cmd=="list-licensed-devices":
         lic_devs = getSupportPortalLicensedDevices(None)
