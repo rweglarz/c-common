@@ -457,6 +457,21 @@ def getLCGOfDevice(serial):
                 return lcg_name
     return None
 
+def getLoggingStatusOfDevice(serial):
+    if not hasattr(getLoggingStatusOfDevice, "ls"):
+        params = copy.copy(base_params)
+        r = etree.Element('show')
+        s = etree.SubElement(r, 'logging-status')
+        s = etree.SubElement(s, 'all')
+        params['cmd'] = etree.tostring(r)
+        #getLoggingStatusOfDevice.ls = etree.fromstring(
+        #    requests.get(pano_base_url, params=params, verify=False).content)
+        getLoggingStatusOfDevice.ls = requests.get(pano_base_url, params=params, verify=False).content
+    ls = getLoggingStatusOfDevice.ls
+    for l in ls.splitlines():
+        if "{}-log-collection".format(serial) in l.decode():
+            return True
+    return False
 
 def getDevices():
     params = copy.copy(base_params)
@@ -479,10 +494,14 @@ def getDevices():
         d['sw-version']= i_d.find('sw-version').text
         dg = getDGOfDevice(serial)
         ts = getTSOfDevice(serial)
+        ls = getLoggingStatusOfDevice(serial)
         if dg is None: 
             dg = "-"
         if ts is None:
             ts = "-" 
+        if ls is False:
+            ls = "-" 
+        d['logging-status'] = ls
         d['dg'] = dg
         d['ts'] = ts
     return devs
@@ -496,6 +515,7 @@ def printDevices():
         'dg',
         'ts',
         'connected',
+        'logging',
         'sw',
     ]
     tdevs = []
@@ -507,6 +527,7 @@ def printDevices():
             d['dg'], 
             d['ts'], 
             d['connected'],
+            d['logging-status'],
             d['sw-version'],
         ])
     print(tabulate(sorted(tdevs, key=operator.itemgetter(2)), headers=headers))
