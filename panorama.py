@@ -386,6 +386,26 @@ def commitDevices(entries):
     return job
 
 
+def commitLCG(lcg):
+    params = copy.copy(base_params)
+    params['type'] = 'commit'
+    params['action'] = 'all'
+    er = etree.Element('commit-all')
+    elcc = etree.SubElement(er, 'log-collector-config')
+    elcg = etree.SubElement(elcc, 'log-collector-group')
+    elcg.text = lcg
+    params['cmd'] = etree.tostring(er)
+    resp = requests.get(pano_base_url, params=params, verify=False).content
+    xml_resp = etree.fromstring(resp)
+    if not xml_resp.attrib.get('status') == 'success':
+        print(resp)
+        raise Exception("Failed submit commit")
+    msg = xml_resp.find('.//msg')
+    for l in msg.findall('./line'):
+        print(l.text)
+    return None
+
+
 def getDGOfDevice(serial):
     if not hasattr(getDGOfDevice, "dgs"):
         params = copy.copy(base_params)
@@ -673,6 +693,12 @@ def main():
         j = panoramaCommit()
         print("Panorama commit job: {}".format(j))
         waitForJobToFinish(j)
+        sys.exit(0)
+    if args.cmd=="commit-lcg":
+        j = panoramaCommit()
+        print("Panorama commit job: {}".format(j))
+        waitForJobToFinish(j)
+        commitLCG("cg2")
         sys.exit(0)
     if args.cmd=="commit-all":
         enableAutoContentPush()
