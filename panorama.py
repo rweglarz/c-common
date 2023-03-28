@@ -270,13 +270,13 @@ def enableAutoContentPushOnTS(ts):
     rtxt = etree.tostring(resp).decode()
     if not resp.attrib.get('status') == 'success':
         print(resp)
-        raise Exception("Delete operation did not succeed: {} {}".format(xpath, rtxt))
+        raise Exception("Config operation did not succeed: {} {}".format(xpath, rtxt))
     if resp.attrib.get('code') == '20':
         # success, command succeeded
         msg = resp.find('msg').text
         if msg=="command succeeded":
             return True
-    raise Exception("Unknown response for delete operation: {} {}".format(xpath, rtxt))
+    raise Exception("Unknown response for config operation: {} {}".format(xpath, rtxt))
 
 
 def enableAutoContentPush():
