@@ -507,23 +507,22 @@ def getDevices():
         serial = i_d.find('serial').text
         devs[serial] = {}
         d = devs[serial]
+        for e in ['connected', 'dg', 'logging-status', 'ts']:
+            d[e] = '-'
         d['serial'] = serial
         d['hostname'] = i_d.find('hostname').text
         d['ip'] = i_d.find('ip-address').text
-        d['connected'] = i_d.find('connected').text
         d['sw-version']= i_d.find('sw-version').text
         dg = getDGOfDevice(serial)
         ts = getTSOfDevice(serial)
-        ls = getLoggingStatusOfDevice(serial)
-        if dg is None: 
-            dg = "-"
-        if ts is None:
-            ts = "-" 
-        if ls is False:
-            ls = "-" 
-        d['logging-status'] = ls
-        d['dg'] = dg
-        d['ts'] = ts
+        if i_d.find('connected').text == "yes":
+            d['connected'] = 'yes'
+        if getLoggingStatusOfDevice(serial) is True:
+            d['logging-status'] = 'yes'
+        if dg is not None:
+            d['dg'] = dg
+        if ts is not None:
+            d['ts'] = ts
     return devs
 
 def printDevices():
