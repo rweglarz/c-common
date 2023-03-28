@@ -675,6 +675,99 @@ def ipTagMapping(op, ip, tag):
     print(etree.tostring(xml_resp, pretty_print=True).decode())
 
 
+def submitConfigChange(params):
+    resp = etree.fromstring(
+        requests.get(pano_base_url, params=params, verify=False).content)
+    rtxt = etree.tostring(resp).decode()
+    if not resp.attrib.get('status') == 'success':
+        print(resp)
+        raise Exception(
+            "Config operation did not succeed: {} {}".format(params['xpath'], rtxt))
+    if resp.attrib.get('code') == '20':
+        # success, command succeeded
+        msg = resp.find('msg').text
+        if msg == "command succeeded":
+            return True
+    raise Exception(
+        "Unknown response for config operation: {} {}".format(params['xpath'], rtxt))
+
+
+def buildVWANDeviceConfig(dev_root, props):
+    es = etree.SubElement(dev_root, 'entry')
+    es.attrib['name'] = props['serial']
+    ebgp = etree.SubElement(es, 'bgp')
+    e = etree.SubElement(ebgp, 'router-id')
+    e.text = props['router_id']
+    e = etree.SubElement(ebgp, 'loopback-address')
+    e.text = props['router_id']
+    e = etree.SubElement(ebgp, 'as-number')
+    e.text = props['asn']
+    e = etree.SubElement(es, 'vr-name')
+    e.text = props['vr']
+    e = etree.SubElement(es, 'type')
+    e.text = props['type']
+    e = etree.SubElement(es, 'site')
+    e.text = props['site']
+    if 'prefixes' in props:
+        epr = etree.SubElement(ebgp, 'prefix-redistribute')
+        for pfx in props['prefixes']:
+            e = etree.SubElement(epr, 'entry')
+            e.attrib['name'] = pfx
+    if 'public_ips' in props:
+        eis = etree.SubElement(es, 'interfaces')
+        for iif in props['public_ips']:
+            e = etree.SubElement(eis, 'entry')
+            e.attrib['name'] = iif
+            e = etree.SubElement(e, 'nat-config')
+            e = etree.SubElement(e, 'static')
+            e = etree.SubElement(e, 'public-ip')
+            e.text = props['public_ips'][iif]
+
+
+def configureVWAN():
+    params = copy.copy(base_params)
+    params['type'] = 'config'
+    params['action'] = 'set'
+    xpath = "/config/devices/entry[@name='localhost.localdomain']"
+    xpath += "/plugins/sd_wan"
+    params['xpath'] = xpath
+    devs = {}
+    # devices
+    dr = etree.Element('devices')
+    for d in devs.values():
+        buildVWANDeviceConfig(dr, d)
+    params['element'] = etree.tostring(dr)
+    print(etree.tostring(dr, pretty_print=True).decode())
+    submitConfigChange(params)
+
+    # cluster
+    cr = etree.Element('vpn-cluster')
+    ec = etree.SubElement(cr, 'entry')
+    ec.attrib['name'] = "azure-vwan"
+    ect = etree.SubElement(ec, 'type')
+    ect.text = 'hub-spoke'
+    eb = etree.SubElement(ec, 'branches')
+    for d in devs.values():
+        print(d)
+        if d['type'] != 'branch':
+            continue
+        e = etree.SubElement(eb, 'entry')
+        e.attrib['name'] = d['serial']
+    ehs = etree.SubElement(ec, 'hubs')
+    for d in devs.values():
+        if d['type'] != 'hub':
+            continue
+        eh = etree.SubElement(ehs, 'entry')
+        eh.attrib['name'] = d['serial']
+        e = etree.SubElement(eh, 'allow-dia-vpn-failover')
+        e.text = 'no'
+        e = etree.SubElement(eh, 'priority')
+        e.text = str(d['prio'])
+    print(etree.tostring(cr, pretty_print=True).decode())
+    params['element'] = etree.tostring(cr)
+    submitConfigChange(params)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='useful actions on panorama'
@@ -688,6 +781,9 @@ def main():
 
     readConfiguration()
     print(args.cmd)
+    if args.cmd == "configure-vwan":
+        configureVWAN()
+        sys.exit(0)
     if args.cmd=="commit":
         j = panoramaCommit()
         print("Panorama commit job: {}".format(j))
