@@ -507,12 +507,16 @@ def getDevices():
         serial = i_d.find('serial').text
         devs[serial] = {}
         d = devs[serial]
-        for e in ['connected', 'dg', 'logging-status', 'ts']:
+        for e in ['connected', 'dg', 'hostname', 'ip', 'logging-status', 'sw-version', 'ts']:
             d[e] = '-'
         d['serial'] = serial
-        d['hostname'] = i_d.find('hostname').text
-        d['ip'] = i_d.find('ip-address').text
-        d['sw-version']= i_d.find('sw-version').text
+        try:
+            # manually added devices which never connected to panorama will not have these details
+            d['ip'] = i_d.find('ip-address').text
+            d['hostname'] = i_d.find('hostname').text
+            d['sw-version']= i_d.find('sw-version').text
+        except:
+            pass
         dg = getDGOfDevice(serial)
         ts = getTSOfDevice(serial)
         if i_d.find('connected').text == "yes":
