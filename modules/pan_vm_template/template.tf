@@ -14,6 +14,7 @@ resource "panos_panorama_management_profile" "hc_azure" {
 
   name  = "hc-azure"
   ping  = true
+  http  = true
   https = true
   permitted_ips = [
     "168.63.129.16/32",
@@ -89,6 +90,7 @@ resource "panos_virtual_router" "this" {
   enable_ecmp             = var.enable_ecmp
   ecmp_max_path           = 4
   ecmp_strict_source_path = var.enable_ecmp
+  ecmp_symmetric_return   = var.enable_ecmp
 
   interfaces = [for e, v in var.interfaces : e]
 
