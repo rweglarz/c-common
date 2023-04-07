@@ -652,8 +652,9 @@ def delicenseFirewallFromPanorama(serial):
     print("Delicense job {} triggered for {}".format(job, serial))
     return job
 
-def ipTagMapping(op, ip, tag):
+def ipTagMapping(op, serial, ip, tag):
     assert(op in ['register', 'unregister'])
+    assert(ip is not None)
     params = copy.copy(base_params)
     um = etree.Element('uid-message')
     t = etree.SubElement(um, 'type')
@@ -664,19 +665,25 @@ def ipTagMapping(op, ip, tag):
     e.attrib['ip'] = ip
     t = etree.SubElement(e, 'tag')
     m = etree.SubElement(t, 'member')
-    m.attrib['timeout'] = str(3600)
+    m.attrib['timeout'] = str(12*3600)
     m.attrib['persistent'] = "0"
     m.text = tag
-    print(etree.tostring(um, pretty_print=True).decode())
+    # print(etree.tostring(um, pretty_print=True).decode())
     params['type'] = 'user-id'
+    if serial is not None:
+        params['target'] = serial
     files = { 'file': ('file', etree.tostring(um), 'text/xml')}
     resp = requests.post(pano_base_url, params=params, files=files, verify=False)
-    print(resp.request.headers)
-    print(resp.request.url)
-    print(resp.request.body)
-    print(resp.content)
+    # print(resp.request.headers)
+    # print(resp.request.url)
+    # print(resp.request.body)
+    # print(resp.content)
     xml_resp = etree.fromstring(resp.content)
-    print(etree.tostring(xml_resp, pretty_print=True).decode())
+    # print(etree.tostring(xml_resp, pretty_print=True).decode())
+    if not xml_resp.attrib.get('status') == 'success':
+        print(resp)
+        raise Exception(
+            "Ip-tag operation did not succeed: {}".format(resp.content))
 
 
 def submitConfigChange(params):
@@ -778,6 +785,7 @@ def main():
     )
     #parser.add_argument('--clean', action='store_true')
     parser.add_argument('--serial', nargs='?', action='store')
+    parser.add_argument('--ip', nargs='?', action='store')
     parser.add_argument('--device-group', nargs='?', action='store')
     parser.add_argument('--not-on-panorama', action='store_true')
     parser.add_argument('cmd')
@@ -863,10 +871,10 @@ def main():
         testXMLAESubinterface()
         sys.exit(0)
     if args.cmd=="register-ip-tag":
-        ipTagMapping("register", "192.168.1.1", "malicious")
+        ipTagMapping("register", args.serial, args.ip, "block-ip")
         sys.exit(0)
     if args.cmd=="unregister-ip-tag":
-        ipTagMapping("unregister", "192.168.1.1", "malicious")
+        ipTagMapping("unregister", args.serial, args.ip, "block-ip")
         sys.exit(0)
     if args.cmd=="query-traffic-logs":
         logs = queryLogs('traffic', "!( rule eq 'inbound appgw' ) and (receive_time in last-hour)")
