@@ -626,8 +626,11 @@ def getSupportPortalLicensedDevices(authcode):
         "authcode": authcode
     }
     devices = {}
-    resp = requests.post(url, data=data, headers=headers, verify=False).content
-    devs = json.loads(resp)
+    resp = requests.post(url, data=data, headers=headers, verify=False)
+    if resp.status_code!=200:
+        print(resp)
+        raise Exception("Invalid response: code:{}, {}".format(resp.status_code, resp.content))
+    devs = json.loads(resp.content)
     for d in devs['UsedDeviceDetails']:
         sn = d.get('SerialNumber')
         devices[sn] = d
