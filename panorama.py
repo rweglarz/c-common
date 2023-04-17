@@ -512,10 +512,10 @@ def getDevices():
         d['serial'] = serial
         try:
             # manually added devices which never connected to panorama will not have these details
-            d['ha']= i_d.find('ha/state').text
             d['ip'] = i_d.find('ip-address').text
             d['hostname'] = i_d.find('hostname').text
             d['sw-version']= i_d.find('sw-version').text
+            d['ha']= i_d.find('ha/state').text
         except:
             pass
         dg = getDGOfDevice(serial)
