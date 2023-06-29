@@ -32,14 +32,22 @@ class jobNotFound(Exception):
     pass
 
 
-def readConfiguration():
+def readConfiguration(panorama_creds_file=None):
     global pano_base_url
     global base_config
 
-    with open(os.path.join(os.path.expanduser("~"), "panorama_creds.json")) as f:
+    if panorama_creds_file:
+        pcf = panorama_creds_file
+    else:
+        if os.path.isfile("panorama_creds.json"):
+            pcf = os.path.join("panorama_creds.json")
+        else:
+            pcf = os.path.join(os.path.expanduser("~"), "panorama_creds.json")
+    with open(pcf) as f:
         data = json.load(f)
         base_params["key"] = data["api_key"]
         pano_base_url = 'https://{}/api/'.format(data['hostname'])
+    print("Using =  {}  = from  {}".format(data["name"], pcf))
     with open(os.path.join(os.path.expanduser("~"), "panorama_config.json")) as f:
         base_config = json.load(f)
 
@@ -790,6 +798,7 @@ def main():
         description='useful actions on panorama'
     )
     #parser.add_argument('--clean', action='store_true')
+    parser.add_argument('--panorama-creds-file', nargs='?', action='store')
     parser.add_argument('--serial', nargs='?', action='store')
     parser.add_argument('--ip', nargs='?', action='store')
     parser.add_argument('--device-group', nargs='?', action='store')
@@ -797,7 +806,7 @@ def main():
     parser.add_argument('cmd')
     args = parser.parse_args()
 
-    readConfiguration()
+    readConfiguration(panorama_creds_file=args.panorama_creds_file)
     print(args.cmd)
     if args.cmd == "configure-vwan":
         configureVWAN()
