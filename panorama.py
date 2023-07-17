@@ -115,7 +115,7 @@ def waitForJobToFinish(id):
         sn = d.find('./serial-no').text
         r = d.find('./result').text
         det_msg = ""
-        print("== {}/{} - {} - {}".format(dn, sn, r, det_msg))
+        print("== {} / {} - {} - {}".format(dn, sn, r, det_msg))
         warnings = []
         ignored = 0
         for l in d.findall('./details/msg/warnings/line'):
