@@ -655,7 +655,7 @@ def getDevicesForCommit(dg=None, ts=None, connected=None, in_sync=None):
                 continue
             if in_sync == False and (policy_status == "In Sync" and not serial in ts_out_of_sync):
                 continue
-            print('{} {}'.format(dg_name, serial))
+            #print('{} {}'.format(dg_name, serial))
             if not dg_name in r:
                 r[dg_name] = []
             r[dg_name].append(serial)
