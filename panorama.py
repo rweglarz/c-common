@@ -375,7 +375,9 @@ def cleanupDevices(min_time, stable_dgs, todo_dg=None, todo_serial=None):
             print("Do not delete {} different dg {}".format(serial, dg))
             continue
         if todo_dg is None and todo_serial is None:
-            query = "(description contains '{} connected') or (description contains '{} disconnected') ".format(serial, serial)
+            query = "(description contains '{} connected')".format(serial)
+            query+= "or (description contains '{} disconnected') ".format(serial)
+            query+= "or (description contains 'successfully authenticated for bootstrapped device {}') ".format(serial)
             logs = queryLogs('system', query)
             if not isDeviceCandidateForRemovalBasedOnHistory(logs, min_time):
                 print("Not suitable for delete {}, too fresh".format(serial))
