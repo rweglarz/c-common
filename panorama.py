@@ -842,6 +842,7 @@ def main():
     parser.add_argument('--ip', nargs='?', action='store')
     parser.add_argument('--device-group', nargs='?', action='store')
     parser.add_argument('--not-on-panorama', action='store_true')
+    parser.add_argument('--query', nargs='?', action='store')
     parser.add_argument('cmd')
     args = parser.parse_args()
 
@@ -931,7 +932,7 @@ def main():
         ipTagMapping("unregister", args.serial, args.ip, "block-ip")
         sys.exit(0)
     if args.cmd=="query-traffic-logs":
-        logs = queryLogs('traffic', "!( rule eq 'inbound appgw' ) and (receive_time in last-hour)")
+        logs = queryLogs('traffic', args.query)
         for e in logs.findall('./entry'):
             #print(etree.tostring(e, pretty_print=True).decode())
             print("{:12}->{:12}:{:4} {:10} {:12}={}".format(
