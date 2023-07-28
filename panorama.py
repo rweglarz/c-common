@@ -78,7 +78,12 @@ def getJobStatus(id):
     s.text = str(id)
     params['cmd'] = etree.tostring(r)
     resp = requests.get(pano_base_url, params=params, verify=False).content
-    xml_resp = etree.fromstring(resp)
+    try:
+        xml_resp = etree.fromstring(resp)
+    except:
+        print("Failed response:")
+        print(resp)
+        raise Exception("Failed parsing resp for job id:".format(id))
     #print(etree.tostring(xml_resp, pretty_print=True).decode())
     return xml_resp
 
