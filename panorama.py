@@ -215,7 +215,8 @@ def doAPIDeleteFromConfig(params, xpath):
         if msg=="Object doesn't exist":
             return False
         if msg=="No object to delete in delete handler":
-            pass
+            #this can happen when dg was deleted, show device group still shows the list 
+            return True
     raise Exception("Unknown response for delete operation: {} {}".format(xpath, rtxt))
 
 
