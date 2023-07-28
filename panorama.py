@@ -891,16 +891,22 @@ def main():
             todo_dg=args.device_group,
             todo_serial=args.serial,
         )
+        print("")
+        print("==== First run complete, check delicense jobs")
         for job in delicense_jobs:
             print("Waiting for {} job to complete".format(job))
             waitForJobToFinish(job)
         if len(delicense_jobs)>0:
+            print("")
+            print("==== Delicense jobs done")
             cleanupDevices(
                 base_config["min_time_for_device_removal"],
                 base_config["permanent_device_groups"],
                 todo_dg=args.device_group,
                 todo_serial=args.serial,
             )
+        else:
+            print("No delicense jobs")
         sys.exit(0)
     if args.cmd=="list-devices":
         printDevices()
