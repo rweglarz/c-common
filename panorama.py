@@ -832,6 +832,61 @@ def configureVWAN():
     submitConfigChange(params)
 
 
+class AzureClient:
+    compute_client  = None
+    network_client  = None
+    resource_client = None
+    rg_names        = []
+    subscription_id = None
+
+    def __init__(self, subscription_id, owner_tag_value):
+        from azure.identity import DefaultAzureCredential
+        from azure.mgmt.compute import ComputeManagementClient
+        from azure.mgmt.network import NetworkManagementClient
+        from azure.mgmt.resource import ResourceManagementClient
+        self.subscription_id = subscription_id
+        credential = DefaultAzureCredential()
+        self.compute_client = ComputeManagementClient(credential, self.subscription_id)
+        self.network_client = NetworkManagementClient(credential, self.subscription_id)
+        self.resource_client = ResourceManagementClient(credential, self.subscription_id)
+        for rgi in self.resource_client.resource_groups.list(filter="tagName eq 'owner' and tagValue eq '{}'".format(owner_tag_value)):
+            self.rg_names.append(rgi.name)
+
+    def findVMIDByName(self, vm_name):
+        for rgi in self.rg_names:
+            vms_in_rg = self.compute_client.virtual_machines.list(rgi)
+            for vmi in vms_in_rg:
+                if vm_name==vmi.name:
+                    return vmi.id
+        return None
+
+    def getAllVMs(self):
+        vm_ids = []
+        for rgi in self.rg_names:
+            vms_in_rg = self.compute_client.virtual_machines.list(rgi)
+            for vmi in vms_in_rg:
+                vm_ids.append(vmi.id)
+        return vm_ids
+
+    def getVMIPs(self, vm_id):
+        ips = {}
+        vm_name = vm_id.split('/')[-1]
+        rg_name = vm_id.split('/')[4]
+        vm = self.compute_client.virtual_machines.get(rg_name, vm_name)
+        for nii in vm.network_profile.network_interfaces:
+            nic_name = nii.id.split('/')[-1]
+            nic = self.network_client.network_interfaces.get(rg_name, nic_name)
+            ip_configs = {}
+            for ipci in nic.ip_configurations:
+                ip_configs[ipci.name] = {}
+                if ipci.public_ip_address:
+                    public_ip_name = ipci.public_ip_address.id.split('/')[-1]
+                    ip_configs[ipci.name]['public_ip_address'] = self.network_client.public_ip_addresses.get(rg_name, public_ip_name).ip_address
+                ip_configs[ipci.name]['private_ip_address'] = ipci.private_ip_address
+            ips[nic_name] = ip_configs
+        return ips
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='useful actions on panorama'
