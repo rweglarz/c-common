@@ -23,6 +23,14 @@ resource "panos_panorama_management_profile" "hc_azure" {
   ]
 }
 
+resource "panos_panorama_management_profile" "https" {
+  template = panos_panorama_template.this.name
+
+  name  = "https"
+  ping  = true
+  https = true
+}
+
 resource "panos_panorama_ethernet_interface" "this" {
   for_each = { for k, v in var.interfaces : k => v if length(regexall("^eth", k)) > 0 }
   template = panos_panorama_template.this.name
