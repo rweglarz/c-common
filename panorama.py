@@ -770,8 +770,7 @@ def ipTagMapping(op, serial, ip, tag):
 
 
 def submitConfigChange(params):
-    resp = etree.fromstring(
-        requests.get(pano_base_url, params=params, verify=False).content)
+    resp = etree.fromstring(panoramaRequestGet(params))
     rtxt = etree.tostring(resp).decode()
     if not resp.attrib.get('status') == 'success':
         print(resp)
