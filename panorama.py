@@ -10,11 +10,12 @@ import operator
 import os
 import requests
 import re
+import ssl
 import sys
 from tabulate import tabulate
 import time
-
 import urllib3
+
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -24,6 +25,8 @@ base_params = {
 }
 base_config = {}
 pano_base_url = 'https://{}/api/'.format('dummy')
+panoramaRequestGet = None
+panoramaRequestPost = None
 
 class commitFailed(Exception):
     pass
@@ -52,12 +55,53 @@ def readConfiguration(panorama_creds_file=None):
         base_config = json.load(f)
 
 
+class CustomHttpAdapter(requests.adapters.HTTPAdapter):
+    def __init__(self, ssl_context=None, **kwargs):
+        self.ssl_context = ssl_context
+        super().__init__(**kwargs)
+
+    def init_poolmanager(self, connections, maxsize, block=False):
+        self.poolmanager = urllib3.poolmanager.PoolManager(
+            num_pools=connections, maxsize=maxsize,
+            block=block, ssl_context=self.ssl_context)
+
+
+def getLegacySSLRequestsSession():
+    ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+    ctx.check_hostname = False
+    # ctx.verify_mode = ssl.CERT_NONE
+    ctx.options |= 0x4  # OP_LEGACY_SERVER_CONNECT
+    #ctx.options |= ssl.OP_LEGACY_SERVER_CONNECT in 3.12?
+    session = requests.session()
+    session.mount('https://', CustomHttpAdapter(ctx))
+    return session
+
+class panoramaRequest:
+    rs = None
+    verify = True
+    def __init__(self, verify=True):
+        self.verify = verify
+        if self.verify:
+            self.rs = requests.session()
+        else:
+            # SSLError(SSLError(1, '[SSL: UNSAFE_LEGACY_RENEGOTIATION_DISABLED] unsafe legacy renegotiation disabled 
+            self.rs = getLegacySSLRequestsSession()
+
+    def get(self, params):
+        c = self.rs.get(pano_base_url, params=params, verify=self.verify).content
+        return c
+
+    def post(self, params, files):
+        c = self.rs.post(pano_base_url, params=params, files=files, verify=self.verify).content
+        return c
+
+
 def panoramaCommit():
     params = copy.copy(base_params)
     params['type'] = 'commit'
     r = etree.Element('commit')
     params['cmd'] = etree.tostring(r)
-    resp = requests.get(pano_base_url, params=params, verify=False).content
+    resp = panoramaRequestGet(params)
     xml_resp = etree.fromstring(resp)
     if not xml_resp.attrib.get('status') == 'success':
         print(resp)
@@ -77,7 +121,7 @@ def getJobStatus(id):
     s = etree.SubElement(s, 'id')
     s.text = str(id)
     params['cmd'] = etree.tostring(r)
-    resp = requests.get(pano_base_url, params=params, verify=False).content
+    resp = panoramaRequestGet(params)
     try:
         xml_resp = etree.fromstring(resp)
     except:
@@ -156,8 +200,7 @@ def queryLogs(log_type, query):
     params['log-type'] = log_type
     params['dir'] = 'backward'
     params['query'] = query
-    resp = etree.fromstring(
-        requests.get(pano_base_url, params=params, verify=False).content)
+    resp = etree.fromstring(panoramaRequestGet(params))
     #print(etree.tostring(resp, pretty_print=True).decode())
     job = resp.find('.//job').text
     while True:
@@ -165,8 +208,7 @@ def queryLogs(log_type, query):
         params['type'] = 'log'
         params['action'] = 'get'
         params['job-id'] = job
-        resp = etree.fromstring(
-            requests.get(pano_base_url, params=params, verify=False).content)
+        resp = etree.fromstring(panoramaRequestGet(params))
         status = resp.find('./result/job/status').text
         #print('log job {} status {}'.format(job, status))
         # just to note the active job status
@@ -199,11 +241,10 @@ def isDeviceCandidateForRemovalBasedOnHistory(logs, min_time):
 
 
 def doAPIDeleteFromConfig(params, xpath):
-    resp = etree.fromstring(
-        requests.get(pano_base_url, params=params, verify=False).content)
+    resp = etree.fromstring(panoramaRequestGet(params))
     rtxt = etree.tostring(resp).decode()
     if not resp.attrib.get('status') == 'success':
-        print(resp)
+        print(etree.tostring(resp, pretty_print=True).decode())
         raise Exception("Delete operation did not succeed: {} {}".format(xpath, rtxt))
     if resp.attrib.get('code') == '20':
         # success, command succeeded
@@ -229,8 +270,7 @@ def testXMLAESubinterface():
     xpath+= "/entry[@name='localhost.localdomain']/network/interface"
     xpath+= "/aggregate-ethernet/entry[@name='{}']".format("ae1")
     params['xpath'] = xpath
-    resp = etree.fromstring(
-        requests.get(pano_base_url, params=params, verify=False).content)
+    resp = etree.fromstring(panoramaRequestGet(params))
     print(etree.tostring(resp, pretty_print=True).decode())
     rtxt = etree.tostring(resp).decode()
 
@@ -247,8 +287,7 @@ def testXMLAESubinterface():
     tag = etree.SubElement(r, 'tag')
     tag.text = "20"
     params['element'] = etree.tostring(r)
-    resp = etree.fromstring(
-        requests.get(pano_base_url, params=params, verify=False).content)
+    resp = etree.fromstring(panoramaRequestGet(params))
     print(etree.tostring(resp, pretty_print=True).decode())
     return
 
@@ -310,8 +349,7 @@ def enableAutoContentPushOnTS(ts):
     r = etree.Element('auto-push-on-1st-conn')
     r.text = "yes"
     params['element'] = etree.tostring(r)
-    resp = etree.fromstring(
-        requests.get(pano_base_url, params=params, verify=False).content)
+    resp = etree.fromstring(panoramaRequestGet(params))
     rtxt = etree.tostring(resp).decode()
     if not resp.attrib.get('status') == 'success':
         print(resp)
@@ -331,8 +369,8 @@ def enableAutoContentPush():
     xpath = "/config/devices/entry[@name='localhost.localdomain']"
     xpath+= "/template-stack"
     params['xpath'] = xpath
-    tss = etree.fromstring(
-        requests.get(pano_base_url, params=params, verify=False).content)
+
+    tss = etree.fromstring(panoramaRequestGet(params))
     for i_ts in tss.findall('./result/template-stack/entry'):
         ts_name = i_ts.get('name')
         desc_n = i_ts.find('description')
@@ -354,8 +392,7 @@ def cleanupDevices(min_time, stable_dgs, todo_dg=None, todo_serial=None):
     s = etree.SubElement(r, 'devices')
     s = etree.SubElement(s, 'all')
     params['cmd'] = etree.tostring(r)
-    resp = etree.fromstring(
-        requests.get(pano_base_url, params=params, verify=False).content)
+    resp = etree.fromstring(panoramaRequestGet(params))
     lic_devs = getSupportPortalLicensedDevices(None)
     for i_d in resp.findall('./result/devices/entry'):
         serial = i_d.find('serial').text
@@ -420,7 +457,7 @@ def commitDevices(entries):
             se = etree.SubElement(des, 'entry', name=s)
     params['cmd'] = etree.tostring(r)
     print(params['cmd'])
-    resp = requests.get(pano_base_url, params=params, verify=False).content
+    resp = panoramaRequestGet(params)
     xml_resp = etree.fromstring(resp)
     if not xml_resp.attrib.get('status') == 'success':
         print(resp)
@@ -442,7 +479,7 @@ def commitLCG(lcg):
     elcg = etree.SubElement(elcc, 'log-collector-group')
     elcg.text = lcg
     params['cmd'] = etree.tostring(er)
-    resp = requests.get(pano_base_url, params=params, verify=False).content
+    resp = etree.fromstring(panoramaRequestGet(params))
     xml_resp = etree.fromstring(resp)
     if not xml_resp.attrib.get('status') == 'success':
         print(resp)
@@ -459,8 +496,7 @@ def getDGOfDevice(serial):
         r = etree.Element('show')
         s = etree.SubElement(r, 'devicegroups')
         params['cmd'] = etree.tostring(r)
-        getDGOfDevice.dgs = etree.fromstring(
-            requests.get(pano_base_url, params=params, verify=False).content)
+        getDGOfDevice.dgs = etree.fromstring(panoramaRequestGet(params=params))
     dgs = getDGOfDevice.dgs
     r = {}
     for i_dg in dgs.findall('./result/devicegroups/entry'):
@@ -477,8 +513,7 @@ def getTSOfDevice(serial):
         r = etree.Element('show')
         s = etree.SubElement(r, 'template-stack')
         params['cmd'] = etree.tostring(r)
-        getTSOfDevice.tss = etree.fromstring(
-            requests.get(pano_base_url, params=params, verify=False).content)
+        getTSOfDevice.tss =etree.fromstring(panoramaRequestGet(params))
     tss = getTSOfDevice.tss
     for i_ts in tss.findall('./result/template-stack/entry'):
         ts_name = i_ts.get('name')
@@ -495,8 +530,7 @@ def getTSOfDeviceFromConfig(serial):
     xpath = "/config/devices/entry[@name='localhost.localdomain']"
     xpath+= "/template-stack"
     params['xpath'] = xpath
-    tss = etree.fromstring(
-        requests.get(pano_base_url, params=params, verify=False).content)
+    tss = etree.fromstring(panoramaRequestGet(params))
     for i_ts in tss.findall('./result/template-stack/entry'):
         ts_name = i_ts.get('name')
         for i_dev in i_ts.findall('./devices/entry'):
@@ -513,8 +547,7 @@ def getLCGOfDevice(serial):
         s = etree.SubElement(r, 'log-collector-group')
         s = etree.SubElement(s, 'all')
         params['cmd'] = etree.tostring(r)
-        getLCGOfDevice.lcgs = etree.fromstring(
-            requests.get(pano_base_url, params=params, verify=False).content)
+        getLCGOfDevice.lcgs =  etree.fromstring(panoramaRequestGet(params=params))
     #print(etree.tostring(lcgs, pretty_print=True).decode())
     lcgs = getLCGOfDevice.lcgs
     for i_lcg in lcgs.findall('./result/log-collector-group/entry'):
@@ -533,7 +566,7 @@ def getLoggingStatusOfDevice(serial):
         params['cmd'] = etree.tostring(r)
         #getLoggingStatusOfDevice.ls = etree.fromstring(
         #    requests.get(pano_base_url, params=params, verify=False).content)
-        getLoggingStatusOfDevice.ls = requests.get(pano_base_url, params=params, verify=False).content
+        getLoggingStatusOfDevice.ls = panoramaRequestGet(params=params)
     ls = getLoggingStatusOfDevice.ls
     for l in ls.splitlines():
         if "{}-log-collection".format(serial) in l.decode():
@@ -546,8 +579,7 @@ def getDevices():
     qd = etree.SubElement(qr, 'devices')
     qs = etree.SubElement(qd, 'all')
     params['cmd'] = etree.tostring(qr)
-    xdevs = etree.fromstring(
-        requests.get(pano_base_url, params=params, verify=False).content)
+    xdevs = etree.fromstring(panoramaRequestGet(params))
     #print(etree.tostring(xdevs, pretty_print=True).decode())
     devs = {}
     for i_d in xdevs.findall('./result/devices/entry'):
@@ -611,8 +643,7 @@ def getDevicesForCommit(dg=None, ts=None, connected=None, in_sync=None):
     r = etree.Element('show')
     s = etree.SubElement(r, 'template-stack')
     params['cmd'] = etree.tostring(r)
-    tss = etree.fromstring(
-        requests.get(pano_base_url, params=params, verify=False).content)
+    tss = etree.fromstring(panoramaRequestGet(params))
     ts_out_of_sync = []
     for i_ts in tss.findall('./result/template-stack/entry'):
         ts_name = i_ts.get('name')
@@ -636,8 +667,7 @@ def getDevicesForCommit(dg=None, ts=None, connected=None, in_sync=None):
     r = etree.Element('show')
     s = etree.SubElement(r, 'devicegroups')
     params['cmd'] = etree.tostring(r)
-    dgs = etree.fromstring(
-        requests.get(pano_base_url, params=params, verify=False).content)
+    dgs = etree.fromstring(panoramaRequestGet(params=params))
     r = {}
     for i_dg in dgs.findall('./result/devicegroups/entry'):
         dg_name = i_dg.get('name')
@@ -696,7 +726,7 @@ def delicenseFirewallFromPanorama(serial):
     s = etree.SubElement(v, 'mode')
     s.text = 'auto'
     params['cmd'] = etree.tostring(r)
-    resp = requests.get(pano_base_url, params=params, verify=False).content
+    resp = panoramaRequestGet(params)
     xml_resp = etree.fromstring(resp)
     if not xml_resp.attrib.get('status') == 'success':
         print(resp)
@@ -726,17 +756,17 @@ def ipTagMapping(op, serial, ip, tag):
     if serial is not None:
         params['target'] = serial
     files = { 'file': ('file', etree.tostring(um), 'text/xml')}
-    resp = requests.post(pano_base_url, params=params, files=files, verify=False)
+    resp = panoramaRequestPost(params, files)
     # print(resp.request.headers)
     # print(resp.request.url)
     # print(resp.request.body)
     # print(resp.content)
-    xml_resp = etree.fromstring(resp.content)
+    xml_resp = etree.fromstring(resp)
     # print(etree.tostring(xml_resp, pretty_print=True).decode())
     if not xml_resp.attrib.get('status') == 'success':
         print(resp)
         raise Exception(
-            "Ip-tag operation did not succeed: {}".format(resp.content))
+            "Ip-tag operation did not succeed: {}".format(resp))
 
 
 def submitConfigChange(params):
@@ -903,6 +933,13 @@ def main():
 
     readConfiguration(panorama_creds_file=args.panorama_creds_file)
     print(args.cmd)
+
+    pr = panoramaRequest(verify=False)
+    global panoramaRequestGet
+    panoramaRequestGet = pr.get
+    global panoramaRequestPost
+    panoramaRequestPost = pr.post
+
     if args.cmd == "configure-vwan":
         configureVWAN()
         sys.exit(0)
