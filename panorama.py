@@ -223,17 +223,15 @@ def queryLogs(log_type, query):
 def isDeviceCandidateForRemovalBasedOnHistory(logs, min_time):
     now = datetime.datetime.now()
     newest = None
-    oldest = None
     for i_l in logs.findall('./entry'):
         time_gen = i_l.find('time_generated').text
         time_gen_ts = datetime.datetime.strptime(time_gen, '%Y/%m/%d %H:%M:%S')
         log = i_l.find('opaque').text
         print("{} {}".format(time_gen_ts, log))
-        oldest = time_gen_ts
         if newest==None:
             newest = time_gen_ts
-            if not re.match(r'disconnected', log):
-                assert("Device should be disconnected, but most recent log is: ".format(log))
+            if not re.match(r'.*disconnected.*', log):
+                raise Exception("Device should be disconnected, but most recent log is: {}".format(log))
     time_diff = (now-newest).total_seconds() / 60
     if (time_diff > min_time):
         return True
