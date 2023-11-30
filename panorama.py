@@ -766,6 +766,30 @@ def ipTagMapping(op, serial, ip, tag):
         raise Exception(
             "Ip-tag operation did not succeed: {}".format(resp))
 
+def getIPTagMapping(serial=None, tag='all'):
+    iptag = {}
+    params = copy.copy(base_params)
+    r = etree.Element('show')
+    s = etree.SubElement(r, 'object')
+    s = etree.SubElement(s, 'registered-ip')
+    s = etree.SubElement(s, tag)
+    params['cmd'] = etree.tostring(r)
+    if serial is not None:
+        params['target'] = serial
+    resp = panoramaRequestGet(params)
+    try:
+        xml_resp = etree.fromstring(resp)
+    except:
+        raise Exception("Failed parsing resp for registered-ip: ".format(resp))
+    if not xml_resp.attrib.get('status') == 'success':
+        raise Exception("Operation failed: {}".format(resp))
+    for e in xml_resp.findall('./result/entry'):
+        ip = e.get('ip')
+        iptag[ip] = []
+        for t in e.findall('./tag/member'):
+            iptag[ip].append(t.text)
+    return iptag
+
 
 def submitConfigChange(params):
     resp = etree.fromstring(panoramaRequestGet(params))
@@ -1025,6 +1049,11 @@ def main():
         sys.exit(0)
     if args.cmd=="unregister-ip-tag":
         ipTagMapping("unregister", args.serial, args.ip, "block-ip")
+        sys.exit(0)
+    if args.cmd=="query-ip-tag":
+        iptag = getIPTagMapping(args.serial)
+        for ip in iptag:
+            print('{} - {}'.format(ip, ','.join(iptag[ip])))
         sys.exit(0)
     if args.cmd=="query-traffic-logs":
         logs = queryLogs('traffic', args.query)
