@@ -791,6 +791,21 @@ def getIPTagMapping(serial=None, tag='all'):
     return iptag
 
 
+def clearBGPSessions(serial):
+    params = copy.copy(base_params)
+    r = etree.Element('clear')
+    s = etree.SubElement(r, 'session')
+    s = etree.SubElement(s, 'all')
+    s = etree.SubElement(s, 'filter')
+    s = etree.SubElement(s, 'destination-port')
+    s.text = '179'
+    params['cmd'] = etree.tostring(r)
+    params['target'] = serial
+    resp = panoramaRequestGet(params)
+    xml_resp = etree.fromstring(resp)
+    print(etree.tostring(xml_resp, pretty_print=True).decode())
+
+
 def submitConfigChange(params):
     resp = etree.fromstring(panoramaRequestGet(params))
     rtxt = etree.tostring(resp).decode()
