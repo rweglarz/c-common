@@ -961,7 +961,7 @@ def main():
     global panoramaRequestPost
     panoramaRequestPost = pr.post
 
-    if args.cmd == "configure-vwan":
+    if args.cmd == "configure-sdwan":
         configureVWAN()
         sys.exit(0)
     if args.cmd=="commit":
