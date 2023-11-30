@@ -1083,6 +1083,13 @@ def main():
                 e.find('rule').text
             ))
         sys.exit(0)
+    if args.cmd == "block-bgp":
+        ipTagMapping("register", args.serial, '0.0.0.0/0', "block-bgp")
+        clearBGPSessions(args.serial)
+        sys.exit(0)
+    if args.cmd == "unblock-bgp":
+        ipTagMapping("unregister", args.serial, '0.0.0.0/0', "block-bgp")
+        sys.exit(0)
     print("Unrecognized command")
     sys.exit(1)
 
