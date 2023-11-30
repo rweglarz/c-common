@@ -832,12 +832,19 @@ def buildVWANDeviceConfig(dev_root, props):
     e.text = props['router_id']
     e = etree.SubElement(ebgp, 'as-number')
     e.text = props['asn']
-    e = etree.SubElement(es, 'vr-name')
+    e = etree.SubElement(es, 'router-name')
     e.text = props['vr']
     e = etree.SubElement(es, 'type')
     e.text = props['type']
     e = etree.SubElement(es, 'site')
     e.text = props['site']
+    e = etree.SubElement(ebgp, 'ipv4-bgp-enable')
+    e.text = 'yes'
+    e = etree.SubElement(ebgp, 'remove-private-as')
+    e.text = 'no'
+    e = etree.SubElement(es, 'vpn-tunnel')
+    e = etree.SubElement(e, 'authentication')
+    e = etree.SubElement(e, 'pre-shared-key')
     if 'prefixes' in props:
         epr = etree.SubElement(ebgp, 'prefix-redistribute')
         for pfx in props['prefixes']:
@@ -876,6 +883,9 @@ def configureVWAN():
     ec.attrib['name'] = "azure-vwan"
     ect = etree.SubElement(ec, 'type')
     ect.text = 'hub-spoke'
+    # ect.text = 'mesh'
+    ect = etree.SubElement(ec, 'authentication_type')
+    ect.text = 'pre-shared-key'
     eb = etree.SubElement(ec, 'branches')
     for d in devs.values():
         print(d)
