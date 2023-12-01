@@ -290,6 +290,55 @@ def testXMLAESubinterface():
     return
 
 
+def getSDWANConfig():
+    if not hasattr(getSDWANConfig, "cfg"):
+        params = copy.copy(base_params)
+        params['type'] = 'config'
+        params['action'] = 'get'
+        xpath = "/config/devices/entry[@name='localhost.localdomain']"
+        xpath+= "/plugins/sd_wan"
+        params['xpath'] = xpath
+        getSDWANConfig.cfg = etree.fromstring(panoramaRequestGet(params=params)).find('./result/sd_wan')
+    cfg = getSDWANConfig.cfg
+    return cfg
+
+
+def findSDWANClusterForDevice(serial):
+    cfg = getSDWANConfig()
+    for i_s in cfg.findall('./vpn-cluster/entry//entry'):
+        s = i_s.get('name')
+        if s==serial:
+            fw_type = i_s.getparent().tag
+            cluster_name = i_s.getparent().getparent().get('name')
+            return (fw_type, cluster_name)
+    return (None, None)
+
+
+def deleteDeviceFromSDWAN(serial):
+    (fw_type, cluster_name) = findSDWANClusterForDevice(serial)
+    if cluster_name:
+        params = copy.copy(base_params)
+        params['type'] = 'config'
+        params['action'] = 'delete'
+        xpath = "/config/devices/entry[@name='localhost.localdomain']"
+        xpath += "/plugins/sd_wan/vpn-cluster/entry[@name='{}']".format(cluster_name)
+        xpath += "/{}/entry[@name='{}']".format(fw_type, serial)
+        params['xpath'] = xpath
+        r = doAPIDeleteFromConfig(params, xpath)
+        if r:
+            print("{} removed from sdwan cluster {}".format(serial, cluster_name))
+    params = copy.copy(base_params)
+    params['type'] = 'config'
+    params['action'] = 'delete'
+    xpath = "/config/devices/entry[@name='localhost.localdomain']"
+    xpath+= "/plugins/sd_wan/devices/entry[@name='{}']".format(serial)
+    params['xpath'] = xpath
+    r = doAPIDeleteFromConfig(params, xpath)
+    if r:
+        print("{} removed from sdwan".format(serial))
+    return r
+
+
 def deleteDeviceFromDG(serial, dg):
     params = copy.copy(base_params)
     params['type'] = 'config'
@@ -426,6 +475,7 @@ def cleanupDevices(min_time, stable_dgs, todo_dg=None, todo_serial=None):
         ts = getTSOfDeviceFromConfig(serial)
         lcg = getLCGOfDevice(serial)
         print("Will delete {}, dg: {}, ts: {}, lcg: {}".format(serial, dg, ts, lcg))
+        deleteDeviceFromSDWAN(serial)
         if dg:
             deleteDeviceFromDG(serial, dg)
         if ts:
