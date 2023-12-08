@@ -305,6 +305,8 @@ def getSDWANConfig():
 
 def findSDWANClusterForDevice(serial):
     cfg = getSDWANConfig()
+    if not cfg:
+        return (None, None)
     for i_s in cfg.findall('./vpn-cluster/entry//entry'):
         s = i_s.get('name')
         if s==serial:
