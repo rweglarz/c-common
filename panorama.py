@@ -635,13 +635,15 @@ def getDevices(connected=None):
     for i_d in xdevs.findall('./result/devices/entry'):
         serial = i_d.find('serial').text
         d = {}
-        for e in ['connected', 'dg', 'ha', 'hostname', 'ip', 'logging-status', 'sw-version', 'ts']:
+        for e in ['connected', 'dg', 'ha', 'hostname', 'ip', 'logging-status', 'model', 'sw-version', 'ts']:
             d[e] = '-'
         d['serial'] = serial
+        #print(etree.tostring(i_d, pretty_print=True).decode())
         try:
             # manually added devices which never connected to panorama will not have these details
             d['ip'] = i_d.find('ip-address').text
             d['hostname'] = i_d.find('hostname').text
+            d['model'] = i_d.find('model').text
             d['sw-version']= i_d.find('sw-version').text
             d['ha']= i_d.find('ha/state').text
         except:
@@ -675,6 +677,7 @@ def printDevices(connected=None):
         'connected',
         'logging',
         'sw',
+        'model',
         'ha',
     ]
     tdevs = []
@@ -688,6 +691,7 @@ def printDevices(connected=None):
             d['connected'],
             d['logging-status'],
             d['sw-version'],
+            d['model'],
             d['ha'],
         ])
     print(tabulate(sorted(tdevs, key=operator.itemgetter(2)), headers=headers))
