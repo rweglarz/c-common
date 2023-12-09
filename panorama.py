@@ -623,7 +623,7 @@ def getLoggingStatusOfDevice(serial):
             return True
     return False
 
-def getDevices():
+def getDevices(connected=None):
     params = copy.copy(base_params)
     qr = etree.Element('show')
     qd = etree.SubElement(qr, 'devices')
@@ -634,8 +634,7 @@ def getDevices():
     devs = {}
     for i_d in xdevs.findall('./result/devices/entry'):
         serial = i_d.find('serial').text
-        devs[serial] = {}
-        d = devs[serial]
+        d = {}
         for e in ['connected', 'dg', 'ha', 'hostname', 'ip', 'logging-status', 'sw-version', 'ts']:
             d[e] = '-'
         d['serial'] = serial
@@ -657,10 +656,16 @@ def getDevices():
             d['dg'] = dg
         if ts is not None:
             d['ts'] = ts
+        if connected is not None:
+            if connected==False and d['connected'] == 'yes':
+                continue
+            if connected==True and d['connected'] == '-':
+                continue
+        devs[serial] = d
     return devs
 
-def printDevices():
-    devs = getDevices()
+def printDevices(connected=None):
+    devs = getDevices(connected)
     headers = [
         'hostname',
         'ip',
@@ -1020,6 +1025,7 @@ def main():
         description='useful actions on panorama'
     )
     #parser.add_argument('--clean', action='store_true')
+    parser.add_argument('--all', action='store_true')
     parser.add_argument('--panorama-creds-file', nargs='?', action='store')
     parser.add_argument('--serial', nargs='?', action='store')
     parser.add_argument('--ip', nargs='?', action='store')
@@ -1099,7 +1105,10 @@ def main():
             print("No delicense jobs")
         sys.exit(0)
     if args.cmd=="list-devices":
-        printDevices()
+        connected = True
+        if args.all:
+            connected = None
+        printDevices(connected)
         sys.exit(0)
     if args.cmd=="list-licensed-devices":
         lic_devs = getSupportPortalLicensedDevices(None)
