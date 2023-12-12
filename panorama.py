@@ -15,6 +15,7 @@ import sys
 from tabulate import tabulate
 import time
 import urllib3
+import xmltodict
 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -925,6 +926,50 @@ def getIPTagMapping(serial=None, tag='all'):
         for t in e.findall('./tag/member'):
             iptag[ip].append(t.text)
     return iptag
+
+
+def getSessions(serial):
+    params = copy.copy(base_params)
+    r = etree.Element('show')
+    s = etree.SubElement(r, 'session')
+    s = etree.SubElement(s, 'all')
+    params['cmd'] = etree.tostring(r)
+    params['target'] = serial
+    resp = panoramaRequestGet(params)
+    xd = xmltodict.parse(resp)
+#    print(xd)
+    if xd['response']['@status']=='success':
+      try:
+        return xd['response']['result']['entry']
+      except:
+        return []
+
+def printSessions(serial):
+    sessions = getSessions(serial)
+    headers = [
+        'id',
+        'org',
+        'nat',
+        'proto',
+        'app',
+        'state',
+        'rule',
+    ]
+    tsessions = []
+    for s in sessions:
+        print(s)
+        tsessions.append([
+            s['idx'],
+            '{}:{} -> {}:{}'.format(s['source'], s['sport'], s['dst'], s['dport']),
+            '{}:{} -> {}:{}'.format(s['xsource'], s['xsport'], s['xdst'], s['xdport']),
+            s['proto'],
+            s['application'],
+            s['state'],
+            s['security-rule'],
+        ])
+    print(tabulate(sorted(tsessions, key=operator.itemgetter(2)), headers=headers))
+    return
+
 
 
 def clearBGPSessions(serial):
