@@ -540,6 +540,74 @@ def commitLCG(lcg):
     return None
 
 
+def summarizeCommitStatus(commit_status, sync_status):
+    if commit_status == 'commit failed':
+        return '--- FAILED ---'
+    elif commit_status == 'not connected':
+        return '({})'.format(sync_status)
+    elif commit_status == 'commit succeeded with warnings':
+        return '{} ({})'.format('warnings', sync_status)
+    elif commit_status == 'commit succeeded':
+        return '{} ({})'.format('succeeded', sync_status)
+    return '{} ({})'.format(commit_status, sync_status)
+
+
+def getConfigStatusOfDevice(serial):
+    if not hasattr(getConfigStatusOfDevice, "dgs"):
+        params = copy.copy(base_params)
+        r = etree.Element('show')
+        s = etree.SubElement(r, 'devicegroups')
+        params['cmd'] = etree.tostring(r)
+        getConfigStatusOfDevice.dgs = etree.fromstring(panoramaRequestGet(params=params))
+    if not hasattr(getConfigStatusOfDevice, "tss"):
+        params = copy.copy(base_params)
+        r = etree.Element('show')
+        s = etree.SubElement(r, 'template-stack')
+        params['cmd'] = etree.tostring(r)
+        getConfigStatusOfDevice.tss = etree.fromstring(panoramaRequestGet(params=params))
+    dgs = getConfigStatusOfDevice.dgs
+    tss = getConfigStatusOfDevice.tss
+    r = {
+       'dg': '-',
+       'dg_status': '-',
+       'policy': {
+           'sync_status': '-',
+           'commit_status': '-',
+       },
+       'ts': '-',
+       'ts_status': '-',
+       'template': {
+           'sync_status': '-',
+           'commit_status': '-',
+       },
+    }
+    for i_dg in dgs.findall('./result/devicegroups/entry'):
+        dg_name = i_dg.get('name')
+        for i_dev in i_dg.findall('./devices/entry'):
+            if serial == i_dev.find('serial').text:
+                try:
+                    r['dg'] = dg_name
+                    r['policy']['sync_status'] = i_dev.find('shared-policy-status').text
+                    r['policy']['commit_status'] = i_dev.find('last-commit-all-state-sp').text
+                except:
+                    pass
+                r['dg_status'] = summarizeCommitStatus(r['policy']['commit_status'], r['policy']['sync_status'])
+                break
+    for i_ts in tss.findall('./result/template-stack/entry'):
+        ts_name = i_ts.get('name')
+        for i_ts in i_ts.findall('./devices/entry'):
+            if serial == i_ts.find('serial').text:
+                try:
+                    r['ts'] = ts_name
+                    r['template']['sync_status'] = i_ts.find('template-status').text
+                    r['template']['commit_status'] = i_ts.find('last-commit-all-state-tpl').text
+                except:
+                    pass
+                r['ts_status'] = summarizeCommitStatus(r['template']['commit_status'], r['template']['sync_status'])
+                break
+    return r
+
+
 def getDGOfDevice(serial):
     if not hasattr(getDGOfDevice, "dgs"):
         params = copy.copy(base_params)
@@ -635,7 +703,7 @@ def getDevices(connected=None):
     for i_d in xdevs.findall('./result/devices/entry'):
         serial = i_d.find('serial').text
         d = {}
-        for e in ['connected', 'dg', 'ha', 'hostname', 'ip', 'logging-status', 'model', 'sw-version', 'ts']:
+        for e in ['connected', 'dg', 'dg_status', 'ha', 'hostname', 'ip', 'logging-status', 'model', 'sw-version', 'ts', 'ts_status']:
             d[e] = '-'
         d['serial'] = serial
         #print(etree.tostring(i_d, pretty_print=True).decode())
@@ -650,6 +718,7 @@ def getDevices(connected=None):
             pass
         dg = getDGOfDevice(serial)
         ts = getTSOfDevice(serial)
+        cs = getConfigStatusOfDevice(serial)
         if i_d.find('connected').text == "yes":
             d['connected'] = 'yes'
         if getLoggingStatusOfDevice(serial) is True:
@@ -658,6 +727,8 @@ def getDevices(connected=None):
             d['dg'] = dg
         if ts is not None:
             d['ts'] = ts
+        d['dg_status'] = cs['dg_status']
+        d['ts_status'] = cs['ts_status']
         if connected is not None:
             if connected==False and d['connected'] == 'yes':
                 continue
@@ -679,6 +750,8 @@ def printDevices(connected=None):
         'sw',
         'model',
         'ha',
+        'dg_status',
+        'ts_status',
     ]
     tdevs = []
     for d in devs.values():
@@ -693,6 +766,8 @@ def printDevices(connected=None):
             d['sw-version'],
             d['model'],
             d['ha'],
+            d['dg_status'],
+            d['ts_status'],
         ])
     print(tabulate(sorted(tdevs, key=operator.itemgetter(2)), headers=headers))
 
