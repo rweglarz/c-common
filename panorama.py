@@ -35,6 +35,9 @@ class commitFailed(Exception):
 class jobNotFound(Exception):
     pass
 
+class deviceNotConnected(Exception):
+    pass
+
 
 def readConfiguration(panorama_creds_file=None):
     global pano_base_url
@@ -939,15 +942,25 @@ def getSessions(serial):
     params['target'] = serial
     resp = panoramaRequestGet(params)
     xd = xmltodict.parse(resp)
-#    print(xd)
     if xd['response']['@status']=='success':
       try:
         return xd['response']['result']['entry']
       except:
         return []
+    if int(xd['response']['@code'])==13:
+        if re.match(r'.*not connected', xd['response']['msg']['line']):
+            raise deviceNotConnected('Get sessions failed')
+    print("Response:")
+    print(xd)
+    raise Exception("Failed request")
+
 
 def printSessions(serial):
-    sessions = getSessions(serial)
+    try:
+        sessions = getSessions(serial)
+    except deviceNotConnected:
+        print("Device {} not connected".format(serial))
+        return
     headers = [
         'id',
         'org',
