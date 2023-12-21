@@ -183,13 +183,17 @@ def waitForJobToFinish(id):
             print("\t\t{}".format(l))
         errors = []
         ignored = 0
-        for l in d.findall('./details/msg/errors/line'):
-            for sti in safe_to_ignore_errors:
-                if re.match(sti, l.text):
-                    ignored+= 1
-                    break
-            else:
-                errors.append(l.text)
+        try:
+            for l in d.findall('./details/msg/errors/line'):
+                for sti in safe_to_ignore_errors:
+                    if l.text and re.match(sti, l.text):
+                        ignored+= 1
+                        break
+                else:
+                    errors.append(l.text)
+        except:
+            print(etree.tostring(js, pretty_print=True).decode())
+            raise Exception("Failed to parse commit message")
         print("\tErrors left:{} (and ignored: {})".format(len(errors), ignored))
         for l in errors:
             print("\t\t{}".format(l))
