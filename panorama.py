@@ -450,7 +450,7 @@ def cleanupDevices(min_time, stable_dgs, todo_dg=None, todo_serial=None):
         print()
         print("== {}".format(serial))
         if todo_serial is not None and todo_serial!=serial:
-            print("Not a match by serial".format(serial))
+            #print("Not a match by serial".format(serial))
             continue
         if todo_serial is None and connected=="yes":
             print("Not suitable for delete {}, still connected".format(serial))
