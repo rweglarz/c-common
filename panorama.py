@@ -883,10 +883,10 @@ def ipTagMapping(op, serial, ip, tag):
     o = etree.SubElement(p, op)
     e = etree.SubElement(o, 'entry')
     e.attrib['ip'] = ip
+    e.attrib['persistent'] = "1"
     t = etree.SubElement(e, 'tag')
     m = etree.SubElement(t, 'member')
     m.attrib['timeout'] = str(12*3600)
-    m.attrib['persistent'] = "0"
     m.text = tag
     # print(etree.tostring(um, pretty_print=True).decode())
     params['type'] = 'user-id'
