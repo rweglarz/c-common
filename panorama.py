@@ -459,9 +459,11 @@ def cleanupDevices(min_time, stable_dgs, todo_dg=None, todo_serial=None):
         if dg in stable_dgs:
             print("Do not delete {} based on dg {} membership".format(serial, dg))
             continue
-        if todo_dg is not None and dg!=todo_dg:
-            print("Do not delete {} different dg {}".format(serial, dg))
-            continue
+        if todo_dg is not None:
+            if not (todo_dg=='orphaned' and dg is None):
+                if dg!=todo_dg:
+                    print("Do not delete {} different dg {}".format(serial, dg))
+                    continue
         if todo_dg is None and todo_serial is None:
             query = "(description contains '{} connected')".format(serial)
             query+= "or (description contains '{} disconnected') ".format(serial)
