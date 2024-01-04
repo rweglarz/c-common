@@ -969,8 +969,10 @@ def printSessions(serial):
         return
     headers = [
         'id',
-        'org',
+        'org flow',
+        'nat flow',
         'nat',
+        'zones',
         'proto',
         'app',
         'state',
@@ -979,10 +981,25 @@ def printSessions(serial):
     tsessions = []
     for s in sessions:
         print(s)
+        o_src_tuple = s['source'] + ':' + s['sport']
+        x_src_tuple = s['xsource'] + ':' + s['xsport']
+        o_dst_tuple = s['dst'] + ':' + s['dport']
+        x_dst_tuple = s['xdst'] + ':' + s['xdport']
+        nat = ''
+        if o_src_tuple != x_src_tuple:
+            nat+= 'x >'
+        else:
+            nat+= 'o >'
+        if o_dst_tuple != x_dst_tuple:
+            nat+= ' x'
+        else:
+            nat+= ' o'
         tsessions.append([
             s['idx'],
-            '{}:{} -> {}:{}'.format(s['source'], s['sport'], s['dst'], s['dport']),
-            '{}:{} -> {}:{}'.format(s['xsource'], s['xsport'], s['xdst'], s['xdport']),
+            '{:22} -> {:22}'.format(o_src_tuple, o_dst_tuple),
+            '{:22} -> {:22}'.format(x_src_tuple, x_dst_tuple),
+            nat,
+            '{:9} -> {}'.format(s['from'], s['to']),
             s['proto'],
             s['application'],
             s['state'],
