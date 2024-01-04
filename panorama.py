@@ -457,11 +457,10 @@ def cleanupDevices(min_time, stable_dgs, todo_dg=None, todo_serial=None):
     for i_d in resp.findall('./result/devices/entry'):
         serial = i_d.find('serial').text
         connected = i_d.find('connected').text
+        if todo_serial is not None and todo_serial!=serial:
+            continue
         print()
         print("== {}".format(serial))
-        if todo_serial is not None and todo_serial!=serial:
-            #print("Not a match by serial".format(serial))
-            continue
         if todo_serial is None and connected=="yes":
             print("Not suitable for delete {}, still connected".format(serial))
             continue
