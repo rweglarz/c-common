@@ -1088,12 +1088,96 @@ def configureVWAN():
     xpath += "/plugins/sd_wan"
     params['xpath'] = xpath
     devs = {}
-    # devices
+    devs["hub2"] = {
+        'serial': '007',
+        'router_id': '192.168.253.31',
+        'asn': '65021',
+        'vr': 'vr1',
+        'type': 'hub',
+        'site': 'hub2a',
+        'prio': 1,
+        'prefixes': [
+            "172.16.0.0/16",
+            "192.0.2.1/32",
+        ],
+        'public_ips': {
+            'ethernet1/1': '192.0.2.1'
+        }
+    }
+    devs["hub22"] = {
+        'serial': '007',
+        'router_id': '192.168.253.32',
+        'asn': '65022',
+        'vr': 'vr1',
+        'type': 'hub',
+        'site': 'hub2b',
+        'prio': 2,
+        'prefixes': [
+            "172.16.0.0/16",
+            "192.0.2.2/32"
+        ],
+        'public_ips': {
+            'ethernet1/1': '192.0.2.2'
+        }
+    }
+    devs["hub4"] = {
+        'serial': '007',
+        'router_id': '192.168.253.36',
+        'asn': '65026',
+        'vr': 'vr1',
+        'type': 'hub',
+        'site': 'hub4',
+        'prio': 3,
+        'prefixes': [
+            "172.16.0.0/16",
+            "192.0.2.3/32"
+        ],
+        'public_ips': {
+            'ethernet1/1': '192.0.2.3'
+        }
+    }
+    devs["spoke1"] = {
+        'serial': '007',
+        'router_id': '192.168.253.101',
+        'asn': '65101',
+        'vr': 'vr1',
+        'type': 'branch',
+        'site': 'spoke1',
+        'public_ips': {
+            'ethernet1/1': '192.0.2.11',
+            'ethernet1/2': '192.0.2.12',
+        },
+        'prefixes': [
+            '172.16.65.0/24'
+        ]
+    }
+    azc = AzureClient(subscription_id=base_config['azure']['subscription_id'], owner_tag_value=base_config['azure']['owner_tag'])
+    for d in getDevices(True).values():
+        hostname = d['hostname']
+        if not 'vwan' in hostname:
+            continue
+        if not 'sdwan' in hostname:
+            continue
+        vmid = azc.findVMIDByName(hostname)
+        ips = azc.getVMIPs(vmid)
+        sdwan_node = None
+        if hostname.endswith('hub2-sdwan-fw'): sdwan_node = 'hub2'
+        if hostname.endswith('hub2-sdwan-fw22'): sdwan_node = 'hub22'
+        if hostname.endswith('hub4-sdwan-fw'): sdwan_node = 'hub4'
+        if hostname.endswith('sdwan-spoke1-fw'): sdwan_node = 'spoke1'
+        assert sdwan_node
+        print(sdwan_node, ' ', devs[sdwan_node]['serial'], ' ', d['serial'])
+        devs[sdwan_node]['serial'] = d['serial']
+        for intf in ips:
+            if intf.endswith('internet') or intf.endswith('isp1'):
+                devs[sdwan_node]['public_ips']['ethernet1/1'] = ips[intf]['primary']['public_ip_address']
+            if intf.endswith('isp2'):
+                devs[sdwan_node]['public_ips']['ethernet1/2'] = ips[intf]['primary']['public_ip_address']
     dr = etree.Element('devices')
     for d in devs.values():
         buildVWANDeviceConfig(dr, d)
     params['element'] = etree.tostring(dr)
-    print(etree.tostring(dr, pretty_print=True).decode())
+    # print(etree.tostring(dr, pretty_print=True).decode())
     submitConfigChange(params)
 
     # cluster
@@ -1107,7 +1191,6 @@ def configureVWAN():
     ect.text = 'pre-shared-key'
     eb = etree.SubElement(ec, 'branches')
     for d in devs.values():
-        print(d)
         if d['type'] != 'branch':
             continue
         e = etree.SubElement(eb, 'entry')
@@ -1122,7 +1205,7 @@ def configureVWAN():
         e.text = 'no'
         e = etree.SubElement(eh, 'priority')
         e.text = str(d['prio'])
-    print(etree.tostring(cr, pretty_print=True).decode())
+    # print(etree.tostring(cr, pretty_print=True).decode())
     params['element'] = etree.tostring(cr)
     submitConfigChange(params)
 
