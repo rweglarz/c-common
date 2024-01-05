@@ -963,7 +963,12 @@ def getSessions(serial):
 
 def printSessions(serial):
     try:
-        sessions = getSessions(serial)
+        sessions = []
+        if isinstance(serial, list):
+            for s in serial:
+                sessions+= getSessions(s)
+        else:
+            sessions = getSessions(serial)
     except deviceNotConnected:
         print("Device {} not connected".format(serial))
         return
@@ -1283,6 +1288,9 @@ def main():
     readConfiguration(panorama_creds_file=args.panorama_creds_file)
     print(args.cmd)
 
+    if args.serial and ',' in args.serial:
+        args.serial = args.serial.split(',')
+
     pr = panoramaRequest(verify=False)
     global panoramaRequestGet
     panoramaRequestGet = pr.get
@@ -1398,6 +1406,9 @@ def main():
                 e.find('action').text,
                 e.find('rule').text
             ))
+        sys.exit(0)
+    if args.cmd == "list-sessions":
+        printSessions(args.serial)
         sys.exit(0)
     if args.cmd == "block-bgp":
         ipTagMapping("register", args.serial, '0.0.0.0/0', "block-bgp")
