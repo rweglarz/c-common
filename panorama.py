@@ -242,7 +242,9 @@ def isDeviceCandidateForRemovalBasedOnHistory(logs, min_time):
         if newest==None:
             newest = time_gen_ts
             if not re.match(r'.*disconnected.*', log):
-                raise Exception("Device should be disconnected, but most recent log is: {}".format(log))
+                #raise Exception("Device should be disconnected, but most recent log is: {}".format(log))
+                print("Device should be disconnected, but most recent log is: {}".format(log))
+                return False
     time_diff = (now-newest).total_seconds() / 60
     if (time_diff > min_time):
         return True
