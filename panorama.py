@@ -977,7 +977,7 @@ def getSessions(serial):
     raise Exception("Failed request")
 
 
-def printSessions(serial):
+def printSessions(serial, all=False):
     try:
         sessions = []
         if isinstance(serial, list):
@@ -1015,8 +1015,13 @@ def printSessions(serial):
             nat+= ' x'
         else:
             nat+= ' o'
-        if s['application'] in ['pan-health-check', 'ntp-base']:
-            continue
+        if not all:
+            if s['application'] in ['pan-health-check', 'ntp-base']:
+                continue
+            if s['source'] in ['168.63.129.16']:
+                continue
+            if s['dport'] in ['3978']:
+                continue
         tsessions.append([
             s['idx'],
             '{:22} -> {:22}'.format(o_src_tuple, o_dst_tuple),
@@ -1440,7 +1445,8 @@ def main():
             ))
         sys.exit(0)
     if args.cmd == "list-sessions":
-        printSessions(args.serial)
+        printSessions(args.serial, args.all)
+        sys.exit(0)
         sys.exit(0)
     if args.cmd == "block-bgp":
         ipTagMapping("register", args.serial, '0.0.0.0/0', "block-bgp")
