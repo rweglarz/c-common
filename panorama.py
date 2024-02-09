@@ -824,7 +824,10 @@ def getDevicesForCommit(dg=None, ts=None, connected=None, in_sync=None):
         for i_dev in i_dg.findall('./devices/entry'):
             serial = i_dev.find('serial').text
             dev_connected = i_dev.find('connected').text
-            policy_status = i_dev.find('shared-policy-status').text
+            try:
+                policy_status = i_dev.find('shared-policy-status').text
+            except:
+                policy_status = None
             if connected == True and dev_connected == "no":
                 continue
             if connected == False and dev_connected == "yes":
