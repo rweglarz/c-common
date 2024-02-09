@@ -1038,6 +1038,18 @@ def printSessions(serial, all=False):
 
 
 
+def executeOpCommand(serial, etree_command):
+    params = copy.copy(base_params)
+    params['cmd'] = etree.tostring(etree_command)
+    params['target'] = serial
+    resp = panoramaRequestGet(params)
+    xml_resp = etree.fromstring(resp)
+    print(etree.tostring(xml_resp, pretty_print=True).decode())
+
+
+
+
+
 def clearBGPSessions(serial):
     params = copy.copy(base_params)
     r = etree.Element('clear')
@@ -1446,6 +1458,12 @@ def main():
         sys.exit(0)
     if args.cmd == "list-sessions":
         printSessions(args.serial, args.all)
+        sys.exit(0)
+    if args.cmd == "show-running-security-policy":
+        r = etree.Element('show')
+        s = etree.SubElement(r, 'running')
+        s = etree.SubElement(s, 'security-policy')
+        executeOpCommand(args.serial, r)
         sys.exit(0)
         sys.exit(0)
     if args.cmd == "block-bgp":
