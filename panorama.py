@@ -961,8 +961,8 @@ def getSessions(serial):
     if int(xd['response']['@code'])==13:
         if re.match(r'.*not connected', xd['response']['msg']['line']):
             raise deviceNotConnected('Get sessions failed')
-    print("Response:")
-    print(xd)
+    # print("Response:")
+    # print(xd)
     raise Exception("Failed request")
 
 
@@ -990,7 +990,7 @@ def printSessions(serial):
     ]
     tsessions = []
     for s in sessions:
-        print(s)
+        # print(s)
         o_src_tuple = s['source'] + ':' + s['sport']
         x_src_tuple = s['xsource'] + ':' + s['xsport']
         o_dst_tuple = s['dst'] + ':' + s['dport']
@@ -1004,6 +1004,8 @@ def printSessions(serial):
             nat+= ' x'
         else:
             nat+= ' o'
+        if s['application'] in ['pan-health-check', 'ntp-base']:
+            continue
         tsessions.append([
             s['idx'],
             '{:22} -> {:22}'.format(o_src_tuple, o_dst_tuple),
