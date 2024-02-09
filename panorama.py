@@ -28,8 +28,12 @@ base_config = {}
 pano_base_url = 'https://{}/api/'.format('dummy')
 panoramaRequestGet = None
 panoramaRequestPost = None
+verbose = False
 
 class commitFailed(Exception):
+    pass
+
+class jobFailed(Exception):
     pass
 
 class jobNotFound(Exception):
@@ -158,14 +162,17 @@ def waitForJobToFinish(id):
             for l in js.findall('./msg/line'):
                 if re.match(r'job \d+ not found', l.text):
                     raise jobNotFound("")
+            print(etree.tostring(js, pretty_print=True).decode())
             raise Exception("unknown error")
         s = js.find('./result/job/status').text
         if s == "FIN":
             break
         time.sleep(5)
+    if verbose:
+        print(etree.tostring(js, pretty_print=True).decode())
     result = js.find('./result/job/result').text
-    if result == "OK":
-        print("Job: {} result: {}".format(id, result))
+    job_type = js.find('./result/job/type').text
+    print("Job: {} type: {} result: {}".format(id, job_type, result))
     for d in js.findall('./result/job/devices/entry'):
         dn = d.find('./devicename').text
         sn = d.find('./serial-no').text
@@ -201,8 +208,12 @@ def waitForJobToFinish(id):
         for l in errors:
             print("\t\t{}".format(l))
     if result != "OK":
-        print(etree.tostring(js, pretty_print=True).decode())
-        raise commitFailed("")
+        if verbose:
+            print(etree.tostring(js, pretty_print=True).decode())
+        if job_type=="Commit":
+            raise commitFailed("")
+        else:
+            raise jobFailed("")
 
 
 def queryLogs(log_type, query):
@@ -1289,6 +1300,7 @@ def main():
     parser.add_argument('--device-group', nargs='?', action='store')
     parser.add_argument('--not-on-panorama', action='store_true')
     parser.add_argument('--query', nargs='?', action='store')
+    parser.add_argument('--verbose', action='store_true')
     parser.add_argument('cmd')
     args = parser.parse_args()
 
@@ -1297,6 +1309,10 @@ def main():
 
     if args.serial and ',' in args.serial:
         args.serial = args.serial.split(',')
+    
+    if args.verbose:
+        global verbose
+        verbose = True
 
     pr = panoramaRequest(verify=False)
     global panoramaRequestGet
@@ -1322,12 +1338,18 @@ def main():
         enableAutoContentPush()
         j = panoramaCommit()
         print("Panorama commit job: {}".format(j))
-        waitForJobToFinish(j)
+        try:
+            waitForJobToFinish(j)
+        except commitFailed:
+            sys.exit(1)
         d = getDevicesForCommit(connected=True, in_sync=False)
         print(d)
         j = commitDevices(d)
         print("Devices commit job: {}".format(j))
-        waitForJobToFinish(j)
+        try:
+            waitForJobToFinish(j)
+        except commitFailed:
+            sys.exit(1)
         sys.exit(0)
     if args.cmd=="push-all":
         d = getDevicesForCommit(connected=True)
@@ -1336,7 +1358,7 @@ def main():
         print("Devices commit job: {}".format(j))
         try:
             waitForJobToFinish(j)
-        except commitFailed:
+        except jobFailed:
             sys.exit(1)
         else:
             sys.exit(0)
@@ -1351,7 +1373,10 @@ def main():
         print("==== First run complete, check delicense jobs")
         for job in delicense_jobs:
             print("Waiting for {} job to complete".format(job))
-            waitForJobToFinish(job)
+            try:
+                waitForJobToFinish(job)
+            except jobFailed as e:
+                print("Job {} failed: ".format(job, e))
         if len(delicense_jobs)>0:
             print("")
             print("==== Delicense jobs done")
