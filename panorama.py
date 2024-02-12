@@ -968,6 +968,10 @@ def getSessions(serial):
       try:
         for s in xd['response']['result']['entry']:
             s['serial'] = serial
+            try:
+                s['security-rule']
+            except:
+                s['security-rule'] = None
         return xd['response']['result']['entry']
       except:
         return []
