@@ -991,7 +991,7 @@ def printSessions(serial, all=False):
         try:
             sessions+= getSessions(s)
         except deviceNotConnected:
-            print("Device {} not connected".format(serial))
+            print("Device {} not connected".format(s))
             pass
     headers = [
         'id',
