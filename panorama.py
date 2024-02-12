@@ -966,6 +966,8 @@ def getSessions(serial):
     xd = xmltodict.parse(resp)
     if xd['response']['@status']=='success':
       try:
+        for s in xd['response']['result']['entry']:
+            s['serial'] = serial
         return xd['response']['result']['entry']
       except:
         return []
@@ -999,6 +1001,8 @@ def printSessions(serial, all=False):
         'state',
         'rule',
     ]
+    if (len(serial)>0):
+        headers.append('serial')
     tsessions = []
     for s in sessions:
         # print(s)
@@ -1022,7 +1026,7 @@ def printSessions(serial, all=False):
                 continue
             if s['dport'] in ['3978']:
                 continue
-        tsessions.append([
+        row = [
             s['idx'],
             '{:22} -> {:22}'.format(o_src_tuple, o_dst_tuple),
             '{:22} -> {:22}'.format(x_src_tuple, x_dst_tuple),
@@ -1032,7 +1036,10 @@ def printSessions(serial, all=False):
             s['application'],
             s['state'],
             s['security-rule'],
-        ])
+        ]
+        if len(serial)>0:
+            row.append(s['serial'])
+        tsessions.append(row)
     print(tabulate(sorted(tsessions, key=operator.itemgetter(2)), headers=headers))
     return
 
