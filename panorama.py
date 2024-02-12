@@ -988,7 +988,10 @@ def printSessions(serial, all=False):
         sessions = []
         if isinstance(serial, list):
             for s in serial:
-                sessions+= getSessions(s)
+                try:
+                    sessions+= getSessions(s)
+                except deviceNotConnected:
+                    pass
         else:
             sessions = getSessions(serial)
     except deviceNotConnected:
@@ -1008,6 +1011,7 @@ def printSessions(serial, all=False):
     if (len(serial)>0):
         headers.append('serial')
     tsessions = []
+    ignored_sessions = 0
     for s in sessions:
         # print(s)
         o_src_tuple = s['source'] + ':' + s['sport']
@@ -1024,11 +1028,14 @@ def printSessions(serial, all=False):
         else:
             nat+= ' o'
         if not all:
-            if s['application'] in ['pan-health-check', 'ntp-base']:
+            if s['application'] in ['pan-health-check', 'pan-login', 'ntp-base']:
+                ignored_sessions+= 1
                 continue
             if s['source'] in ['168.63.129.16']:
+                ignored_sessions+= 1
                 continue
             if s['dport'] in ['3978']:
+                ignored_sessions+= 1
                 continue
         row = [
             s['idx'],
@@ -1044,6 +1051,9 @@ def printSessions(serial, all=False):
         if len(serial)>0:
             row.append(s['serial'])
         tsessions.append(row)
+    print("Retrieved {} sessions, ignored {} and {} remained".format(len(sessions), ignored_sessions, len(sessions)-ignored_sessions))
+    if (len(sessions)-ignored_sessions)==0:
+        return
     print(tabulate(sorted(tsessions, key=operator.itemgetter(2)), headers=headers))
     return
 
