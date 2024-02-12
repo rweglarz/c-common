@@ -984,19 +984,15 @@ def getSessions(serial):
 
 
 def printSessions(serial, all=False):
-    try:
-        sessions = []
-        if isinstance(serial, list):
-            for s in serial:
-                try:
-                    sessions+= getSessions(s)
-                except deviceNotConnected:
-                    pass
-        else:
-            sessions = getSessions(serial)
-    except deviceNotConnected:
-        print("Device {} not connected".format(serial))
-        return
+    sessions = []
+    if not isinstance(serial, list):
+        serial = [serial]
+    for s in serial:
+        try:
+            sessions+= getSessions(s)
+        except deviceNotConnected:
+            print("Device {} not connected".format(serial))
+            pass
     headers = [
         'id',
         'org flow',
