@@ -633,6 +633,23 @@ def getConfigStatusOfDevice(serial):
     return r
 
 
+def getDevicesInDG(dg):
+    serials = []
+    if not hasattr(getDevicesInDG, "dgs"):
+        params = copy.copy(base_params)
+        r = etree.Element('show')
+        s = etree.SubElement(r, 'devicegroups')
+        s = etree.SubElement(s, 'name')
+        s.text = dg
+        params['cmd'] = etree.tostring(r)
+        getDevicesInDG.dgs = etree.fromstring(panoramaRequestGet(params=params))
+    dgs = getDevicesInDG.dgs
+    for i_dg in dgs.findall('./result/devicegroups/entry'):
+        for i_dev in i_dg.findall('./devices/entry'):
+            serials.append(i_dev.find('serial').text)
+    return serials
+
+
 def getDGOfDevice(serial):
     if not hasattr(getDGOfDevice, "dgs"):
         params = copy.copy(base_params)
@@ -1476,7 +1493,11 @@ def main():
             ))
         sys.exit(0)
     if args.cmd == "list-sessions":
-        printSessions(args.serial, args.all)
+        if args.device_group:
+            serials = getDevicesInDG(args.device_group)
+        else:
+            serials = args.serial
+        printSessions(serials, args.all)
         sys.exit(0)
     if args.cmd == "show-running-security-policy":
         r = etree.Element('show')
