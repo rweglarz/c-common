@@ -973,7 +973,9 @@ def getSessions(serial):
             except:
                 s['security-rule'] = None
         return xd['response']['result']['entry']
-      except:
+      except Exception as e:
+        print(s)
+        print(e)
         return []
     if int(xd['response']['@code'])==13:
         if re.match(r'.*not connected', xd['response']['msg']['line']):
