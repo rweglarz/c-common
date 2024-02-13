@@ -377,6 +377,20 @@ def deleteDeviceFromDG(serial, dg):
     return r
 
 
+def addDeviceToTS(serial, ts):
+    params = copy.copy(base_params)
+    params['type'] = 'config'
+    params['action'] = 'set'
+    xpath = "/config/devices/entry[@name='localhost.localdomain']"
+    xpath+= "/template-stack/entry[@name='{}']/devices".format(ts)
+    params['xpath'] = xpath
+    r = etree.Element('entry')
+    r.attrib['name'] = serial
+    params['element'] = etree.tostring(r)
+    submitConfigChange(params)
+    print("{} added to ts {}".format(serial, ts))
+
+
 def deleteDeviceFromTS(serial, ts):
     params = copy.copy(base_params)
     params['type'] = 'config'
@@ -1351,6 +1365,7 @@ def main():
     parser.add_argument('--serial', nargs='?', action='store')
     parser.add_argument('--ip', nargs='?', action='store')
     parser.add_argument('--device-group', nargs='?', action='store')
+    parser.add_argument('--template-stack', nargs='?', action='store')
     parser.add_argument('--not-on-panorama', action='store_true')
     parser.add_argument('--query', nargs='?', action='store')
     parser.add_argument('--verbose', action='store_true')
@@ -1375,6 +1390,11 @@ def main():
 
     if args.cmd == "configure-sdwan":
         configureVWAN()
+        sys.exit(0)
+    if args.cmd=="assign-ts":
+        old_ts = getTSOfDeviceFromConfig(args.serial)
+        deleteDeviceFromTS(args.serial, old_ts)
+        addDeviceToTS(args.serial, args.template_stack)
         sys.exit(0)
     if args.cmd=="commit":
         j = panoramaCommit()
