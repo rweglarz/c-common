@@ -963,7 +963,7 @@ def getSessions(serial):
     params['cmd'] = etree.tostring(r)
     params['target'] = serial
     resp = panoramaRequestGet(params)
-    xd = xmltodict.parse(resp)
+    xd = xmltodict.parse(resp, force_list={'entry'})
     if xd['response']['@status']=='success':
       try:
         for s in xd['response']['result']['entry']:
