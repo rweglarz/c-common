@@ -996,6 +996,8 @@ def getSessions(serial):
     resp = panoramaRequestGet(params)
     xd = xmltodict.parse(resp, force_list={'entry'})
     if xd['response']['@status']=='success':
+      if xd['response']['result']==None:
+          return []
       try:
         for s in xd['response']['result']['entry']:
             s['serial'] = serial
