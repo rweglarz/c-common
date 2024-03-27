@@ -986,6 +986,62 @@ def getIPTagMapping(serial=None, tag='all'):
     return iptag
 
 
+def getUserIPMapping(serial):
+    iptag = {}
+    params = copy.copy(base_params)
+    r = etree.Element('show')
+    s = etree.SubElement(r, 'user')
+    s = etree.SubElement(s, 'ip-user-mapping-mp')
+    s = etree.SubElement(s, 'all')
+    params['cmd'] = etree.tostring(r)
+    if serial is not None:
+        params['target'] = serial
+    resp = panoramaRequestGet(params)
+    print(resp)
+    try:
+        xml_resp = etree.fromstring(resp)
+    except:
+        raise Exception("Failed parsing resp for registered-ip: ".format(resp))
+    if not xml_resp.attrib.get('status') == 'success':
+        raise Exception("Operation failed: {}".format(resp))
+    for e in xml_resp.findall('./result/entry'):
+        ip = e.find('ip').text
+        user = e.find('user').text
+        timeout = e.find('timeout').text
+        print("{} {} {}".format(ip, user, timeout))
+    
+
+def userIPMapping(op, serial, user, ip):
+    assert(op in ['login', 'logout'])
+    assert(ip is not None)
+    assert(user is not None)
+    params = copy.copy(base_params)
+    um = etree.Element('uid-message')
+    t = etree.SubElement(um, 'version')
+    t.text = '1.0'
+    t = etree.SubElement(um, 'type')
+    t.text = 'update'
+    p = etree.SubElement(um, 'payload')
+    o = etree.SubElement(p, op)
+    e = etree.SubElement(o, 'entry')
+    e.attrib['name'] = user
+    e.attrib['ip'] = ip
+    if op!='logout':
+        e.attrib['timeout'] = str(1*1818)
+    params['type'] = 'user-id'
+    print(etree.tostring(um, pretty_print=False).decode())
+    if serial is not None:
+        params['target'] = serial
+    files = { 'file': ('file', etree.tostring(um), 'text/xml')}
+    resp = panoramaRequestPost(params, files)
+    xml_resp = etree.fromstring(resp)
+    if not xml_resp.attrib.get('status') == 'success':
+        print(resp)
+        raise Exception(
+            "user-ip operation did not succeed: {}".format(resp))
+
+
+
 def getSessions(serial):
     params = copy.copy(base_params)
     r = etree.Element('show')
