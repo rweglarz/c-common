@@ -426,6 +426,43 @@ def deleteDeviceFromPanoramaDevices(serial):
     return r
 
 
+def configureAzureResourceGroupInTemplate(template, resource_group):
+    params = copy.copy(base_params)
+    params['type'] = 'config'
+    params['action'] = 'set'
+    xpath = "/config/devices/entry[@name='localhost.localdomain']"
+    xpath+= "/template/entry[@name='{}']".format(template)
+    xpath+= "/config/devices/entry[@name='localhost.localdomain']"
+    xpath+= "/deviceconfig/plugins/vm_series/azure-ha-config"
+    params['xpath'] = xpath
+    r = etree.Element('resource-group')
+    r.text = resource_group
+    params['element'] = etree.tostring(r)
+    resp = etree.fromstring(panoramaRequestGet(params))
+    rtxt = etree.tostring(resp).decode()
+    if not resp.attrib.get('status') == 'success':
+        print(resp)
+        raise Exception("Config operation did not succeed: {} {}".format(xpath, rtxt))
+
+
+def applyTemplateConfigurations():
+    params = copy.copy(base_params)
+    params['type'] = 'config'
+    params['action'] = 'get'
+    xpath = "/config/devices/entry[@name='localhost.localdomain']"
+    xpath+= "/template"
+    params['xpath'] = xpath
+    ts = etree.fromstring(panoramaRequestGet(params))
+    for i_t in ts.findall('./result/template/entry'):
+        t_name = i_t.get('name')
+        desc_n = i_t.find('description')
+        if desc_n is None:
+            continue
+        if mre:=re.match(r'azrg:([^ ]+)', desc_n.text):
+            azrg = mre[1]
+            configureAzureResourceGroupInTemplate(t_name, azrg)
+
+
 def enableAutoContentPushOnTS(ts):
     params = copy.copy(base_params)
     params['type'] = 'config'
@@ -1467,6 +1504,7 @@ def main():
         sys.exit(0)
     if args.cmd=="commit-all":
         enableAutoContentPush()
+        applyTemplateConfigurations()
         j = panoramaCommit()
         print("Panorama commit job: {}".format(j))
         try:
