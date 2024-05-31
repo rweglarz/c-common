@@ -1506,12 +1506,18 @@ def main():
         enableAutoContentPush()
         applyTemplateConfigurations()
         j = panoramaCommit()
+        if j is None:
+            print("Nothing to commit to panorama, done here")
+            sys.exit(0)
         print("Panorama commit job: {}".format(j))
         try:
             waitForJobToFinish(j)
         except commitFailed:
             sys.exit(1)
         d = getDevicesForCommit(connected=True, in_sync=False)
+        if len(d)==0:
+            print("No devices to commit, push to all")
+            d = getDevicesForCommit(connected=True)
         print(d)
         j = commitDevices(d)
         print("Devices commit job: {}".format(j))
