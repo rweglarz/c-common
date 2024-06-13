@@ -1023,6 +1023,46 @@ def getIPTagMapping(serial=None, tag='all'):
     return iptag
 
 
+
+def getTSs():
+    if not hasattr(getTSs, "tss"):
+        params = copy.copy(base_params)
+        params['type'] = 'config'
+        params['action'] = 'get'
+        xpath = "/config/devices/entry[@name='localhost.localdomain']"
+        xpath+= "/template-stack"
+        params['xpath'] = xpath
+        getTSs.tss =  etree.fromstring(panoramaRequestGet(params=params))
+    return getTSs.tss
+
+def getTSValue(ts, path):
+    tss = getTSs()
+    for i_ts in tss.findall('./result/template-stack/entry'):
+        ts_name = i_ts.get('name')
+        if ts_name!=ts:
+            continue
+        print(i_ts.tag)
+        print(path)
+        for i_p in i_ts.findall(path):
+            return i_p.text
+    raise KeyError("path {} not found in {}".format(path, ts))
+
+
+def getTSVariable(ts, variable):
+    tss = getTSs()
+    for i_ts in tss.findall('./result/template-stack/entry'):
+        ts_name = i_ts.get('name')
+        if ts_name!=ts:
+            continue
+        for i_v in i_ts.findall('./variable/entry[@name="{}"]'.format("$"+variable)):
+            for i_t in i_v.findall('./type/as-number'):
+                return i_t.text
+            for i_t in i_v.findall('./type/ip-netmask'):
+                return i_t.text
+    raise KeyError("variable {} not found in {}".format(variable, ts))
+
+
+
 def getUserIPMapping(serial):
     iptag = {}
     params = copy.copy(base_params)
