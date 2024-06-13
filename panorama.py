@@ -1503,6 +1503,7 @@ def main():
     parser.add_argument('--template-stack', nargs='?', action='store')
     parser.add_argument('--not-on-panorama', action='store_true')
     parser.add_argument('--query', nargs='?', action='store')
+    parser.add_argument('--tag', nargs='?', action='store')
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('cmd')
     args = parser.parse_args()
@@ -1631,10 +1632,10 @@ def main():
         testXMLAESubinterface()
         sys.exit(0)
     if args.cmd=="register-ip-tag":
-        ipTagMapping("register", args.serial, args.ip, "block-ip")
+        ipTagMapping("register", args.serial, args.ip, args.tag)
         sys.exit(0)
     if args.cmd=="unregister-ip-tag":
-        ipTagMapping("unregister", args.serial, args.ip, "block-ip")
+        ipTagMapping("unregister", args.serial, args.ip, args.tag)
         sys.exit(0)
     if args.cmd=="query-ip-tag":
         iptag = getIPTagMapping(args.serial)
