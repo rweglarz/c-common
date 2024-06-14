@@ -1266,7 +1266,7 @@ def submitConfigChange(params):
         "Unknown response for config operation: {} {}".format(params['xpath'], rtxt))
 
 
-def buildVWANDeviceConfig(dev_root, props):
+def buildSDWANDeviceConfig(dev_root, props):
     es = etree.SubElement(dev_root, 'entry')
     es.attrib['name'] = props['serial']
     ebgp = etree.SubElement(es, 'bgp')
@@ -1305,7 +1305,7 @@ def buildVWANDeviceConfig(dev_root, props):
             e.text = props['public_ips'][iif]
 
 
-def configureVWAN():
+def configureSDWAN():
     params = copy.copy(base_params)
     params['type'] = 'config'
     params['action'] = 'set'
@@ -1313,69 +1313,30 @@ def configureVWAN():
     xpath += "/plugins/sd_wan"
     params['xpath'] = xpath
     devs = {}
-    devs["hub2"] = {
-        'serial': '007',
-        'router_id': '192.168.253.31',
-        'asn': '65021',
-        'vr': 'vr1',
-        'type': 'hub',
-        'site': 'hub2a',
+    devs["hub2-fw1"] = {
         'prio': 1,
         'prefixes': [
             "172.16.0.0/16",
-            "192.0.2.1/32",
         ],
-        'public_ips': {
-            'ethernet1/1': '192.0.2.1'
-        }
     }
-    devs["hub22"] = {
-        'serial': '007',
-        'router_id': '192.168.253.32',
-        'asn': '65022',
-        'vr': 'vr1',
-        'type': 'hub',
-        'site': 'hub2b',
+    devs["hub2-fw2"] = {
         'prio': 2,
         'prefixes': [
             "172.16.0.0/16",
-            "192.0.2.2/32"
         ],
-        'public_ips': {
-            'ethernet1/1': '192.0.2.2'
-        }
     }
-    devs["hub4"] = {
-        'serial': '007',
-        'router_id': '192.168.253.36',
-        'asn': '65026',
-        'vr': 'vr1',
-        'type': 'hub',
-        'site': 'hub4',
+    devs["hub4-fw"] = {
         'prio': 3,
         'prefixes': [
             "172.16.0.0/16",
-            "192.0.2.3/32"
         ],
-        'public_ips': {
-            'ethernet1/1': '192.0.2.3'
-        }
     }
-    devs["spoke1"] = {
-        'serial': '007',
-        'router_id': '192.168.253.101',
-        'asn': '65101',
-        'vr': 'vr1',
-        'type': 'branch',
-        'site': 'spoke1',
-        'public_ips': {
-            'ethernet1/1': '192.0.2.11',
-            'ethernet1/2': '192.0.2.12',
-        },
+    devs["spoke1-fw"] = {
         'prefixes': [
             '172.16.65.0/24'
         ]
     }
+    devs = {}
     azc = AzureClient(subscription_id=base_config['azure']['subscription_id'], owner_tag_value=base_config['azure']['owner_tag'])
     for d in getDevices(True).values():
         hostname = d['hostname']
@@ -1383,16 +1344,27 @@ def configureVWAN():
             continue
         if not 'sdwan' in hostname:
             continue
+        print(hostname)
         vmid = azc.findVMIDByName(hostname)
         ips = azc.getVMIPs(vmid)
-        sdwan_node = None
-        if hostname.endswith('hub2-sdwan-fw'): sdwan_node = 'hub2'
-        if hostname.endswith('hub2-sdwan-fw22'): sdwan_node = 'hub22'
-        if hostname.endswith('hub4-sdwan-fw'): sdwan_node = 'hub4'
-        if hostname.endswith('sdwan-spoke1-fw'): sdwan_node = 'spoke1'
-        assert sdwan_node
-        print(sdwan_node, ' ', devs[sdwan_node]['serial'], ' ', d['serial'])
-        devs[sdwan_node]['serial'] = d['serial']
+        sdwan_node = hostname
+        devs[hostname] = {
+            "public_ips": {},
+            "prefixes": []
+        }
+        if 'hub' in hostname:
+            devs[hostname]['type'] = 'hub'
+            devs[sdwan_node]['prio'] = 1
+            # if 'fw2' in hostname:
+            #     devs[sdwan_node]['prio'] = 2
+        else:
+            devs[hostname]['type'] = 'branch'
+        devs[hostname]['serial']    = d['serial']
+        devs[hostname]['asn']       = getTSValue(d['ts'], './/network/virtual-router/entry[@name="vr1"]/protocol/bgp/local-as')
+        devs[hostname]['router_id'] = getTSValue(d['ts'], './/network/virtual-router/entry[@name="vr1"]/protocol/bgp/router-id')
+        devs[hostname]['site']      = hostname
+        devs[hostname]['vr']        = 'vr1'
+        print(hostname, ' ', devs[hostname]['serial'])
         for intf in ips:
             if intf.endswith('internet') or intf.endswith('isp1'):
                 devs[sdwan_node]['public_ips']['ethernet1/1'] = ips[intf]['primary']['public_ip_address']
@@ -1400,7 +1372,8 @@ def configureVWAN():
                 devs[sdwan_node]['public_ips']['ethernet1/2'] = ips[intf]['primary']['public_ip_address']
     dr = etree.Element('devices')
     for d in devs.values():
-        buildVWANDeviceConfig(dr, d)
+        print(d)
+        buildSDWANDeviceConfig(dr, d)
     params['element'] = etree.tostring(dr)
     # print(etree.tostring(dr, pretty_print=True).decode())
     submitConfigChange(params)
@@ -1525,7 +1498,7 @@ def main():
     panoramaRequestPost = pr.post
 
     if args.cmd == "configure-sdwan":
-        configureVWAN()
+        configureSDWAN()
         sys.exit(0)
     if args.cmd=="assign-ts":
         old_ts = getTSOfDeviceFromConfig(args.serial)
