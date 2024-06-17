@@ -1314,19 +1314,16 @@ def configureSDWAN():
     params['xpath'] = xpath
     devs = {}
     devs["hub2-fw1"] = {
-        'prio': 1,
         'prefixes': [
             "172.16.0.0/16",
         ],
     }
     devs["hub2-fw2"] = {
-        'prio': 2,
         'prefixes': [
             "172.16.0.0/16",
         ],
     }
     devs["hub4-fw"] = {
-        'prio': 3,
         'prefixes': [
             "172.16.0.0/16",
         ],
@@ -1356,11 +1353,10 @@ def configureSDWAN():
             "public_ips": {},
             "prefixes": []
         }
-        if 'hub' in hostname:
+        ts_desc = getTSValue(d['ts'], './/description')
+        if mre:=re.match(r'.*pat:sdwan:hub:([\d+]).*', ts_desc):
             devs[hostname]['type'] = 'hub'
-            devs[sdwan_node]['prio'] = 1
-            # if 'fw2' in hostname:
-            #     devs[sdwan_node]['prio'] = 2
+            devs[hostname]['prio'] = mre[1]
         else:
             devs[hostname]['type'] = 'branch'
         devs[hostname]['serial']    = d['serial']
