@@ -1337,6 +1337,7 @@ def configureSDWAN():
         ]
     }
     devs = {}
+    print("Collecting SDWAN config")
     azc = AzureClient(subscription_id=base_config['azure']['subscription_id'], owner_tag_value=base_config['azure']['owner_tag'])
     for d in getDevices(True).values():
         hostname = d['hostname']
@@ -1344,9 +1345,12 @@ def configureSDWAN():
             continue
         if not 'sdwan' in hostname:
             continue
-        print(hostname)
+        print("Finding VM {} in azure...\r".format(hostname), end='\r')
         vmid = azc.findVMIDByName(hostname)
+        print("Getting {} IPs...{:50}\r".format(hostname, " "), end='\r')
+        sys.stdout.flush()
         ips = azc.getVMIPs(vmid)
+        print("Done {:50}\r".format(hostname, " "), end='\r')
         sdwan_node = hostname
         devs[hostname] = {
             "public_ips": {},
@@ -1364,7 +1368,7 @@ def configureSDWAN():
         devs[hostname]['router_id'] = getTSValue(d['ts'], './/network/virtual-router/entry[@name="vr1"]/protocol/bgp/router-id')
         devs[hostname]['site']      = hostname
         devs[hostname]['vr']        = 'vr1'
-        print(hostname, ' ', devs[hostname]['serial'])
+        print(f"{hostname:35} {devs[hostname]['serial']} {devs[hostname]['type']}")
         for intf in ips:
             if intf.endswith('internet') or intf.endswith('isp1'):
                 devs[sdwan_node]['public_ips']['ethernet1/1'] = ips[intf]['primary']['public_ip_address']
@@ -1372,10 +1376,10 @@ def configureSDWAN():
                 devs[sdwan_node]['public_ips']['ethernet1/2'] = ips[intf]['primary']['public_ip_address']
     dr = etree.Element('devices')
     for d in devs.values():
-        print(d)
         buildSDWANDeviceConfig(dr, d)
     params['element'] = etree.tostring(dr)
     # print(etree.tostring(dr, pretty_print=True).decode())
+    print("Submiting SDWAN devices")
     submitConfigChange(params)
 
     # cluster
@@ -1405,7 +1409,9 @@ def configureSDWAN():
         e.text = str(d['prio'])
     # print(etree.tostring(cr, pretty_print=True).decode())
     params['element'] = etree.tostring(cr)
+    print("Submiting SDWAN cluster")
     submitConfigChange(params)
+    print("SDWAN config completed")
 
 
 class AzureClient:
