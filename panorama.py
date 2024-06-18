@@ -329,7 +329,7 @@ def getSDWANConfig():
 
 def findSDWANClusterForDevice(serial):
     cfg = getSDWANConfig()
-    if not cfg:
+    if cfg is None:
         return (None, None)
     for i_s in cfg.findall('./vpn-cluster/entry//entry'):
         s = i_s.get('name')
@@ -1041,8 +1041,6 @@ def getTSValue(ts, path):
         ts_name = i_ts.get('name')
         if ts_name!=ts:
             continue
-        print(i_ts.tag)
-        print(path)
         for i_p in i_ts.findall(path):
             return i_p.text
     raise KeyError("path {} not found in {}".format(path, ts))
@@ -1447,6 +1445,7 @@ class AzureClient:
         return vm_ids
 
     def getVMIPs(self, vm_id):
+        assert(vm_id)
         ips = {}
         vm_name = vm_id.split('/')[-1]
         rg_name = vm_id.split('/')[4]
