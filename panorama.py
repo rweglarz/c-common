@@ -1311,27 +1311,6 @@ def configureSDWAN():
     xpath += "/plugins/sd_wan"
     params['xpath'] = xpath
     devs = {}
-    devs["hub2-fw1"] = {
-        'prefixes': [
-            "172.16.0.0/16",
-        ],
-    }
-    devs["hub2-fw2"] = {
-        'prefixes': [
-            "172.16.0.0/16",
-        ],
-    }
-    devs["hub4-fw"] = {
-        'prefixes': [
-            "172.16.0.0/16",
-        ],
-    }
-    devs["spoke1-fw"] = {
-        'prefixes': [
-            '172.16.65.0/24'
-        ]
-    }
-    devs = {}
     print("Collecting SDWAN config")
     azc = AzureClient(subscription_id=base_config['azure']['subscription_id'], owner_tag_value=base_config['azure']['owner_tag'])
     for d in getDevices(True).values():
@@ -1355,8 +1334,11 @@ def configureSDWAN():
         if mre:=re.match(r'.*pat:sdwan:hub:([\d+]).*', ts_desc):
             devs[hostname]['type'] = 'hub'
             devs[hostname]['prio'] = mre[1]
+            devs[hostname]['prefixes'].append("172.16.0.0/16")
         else:
             devs[hostname]['type'] = 'branch'
+            prv_route = getTSValue(d['ts'], './/network/virtual-router/entry[@name="vr1"]/routing-table/ip/static-route/entry[@name="prv"]/destination')
+            devs[hostname]['prefixes'].append(prv_route)
         devs[hostname]['serial']    = d['serial']
         devs[hostname]['asn']       = getTSValue(d['ts'], './/network/virtual-router/entry[@name="vr1"]/protocol/bgp/local-as')
         devs[hostname]['router_id'] = getTSValue(d['ts'], './/network/virtual-router/entry[@name="vr1"]/protocol/bgp/router-id')
