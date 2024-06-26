@@ -89,6 +89,7 @@ class panoramaRequest:
     verify = True
     def __init__(self, verify=True):
         self.verify = verify
+        self.timeout = (10, 60)   # connect, read
         if self.verify:
             self.rs = requests.session()
         else:
@@ -96,11 +97,11 @@ class panoramaRequest:
             self.rs = getLegacySSLRequestsSession()
 
     def get(self, params):
-        c = self.rs.get(pano_base_url, params=params, verify=self.verify).content
+        c = self.rs.get(pano_base_url, params=params, verify=self.verify, timeout=self.timeout).content
         return c
 
     def post(self, params, files):
-        c = self.rs.post(pano_base_url, params=params, files=files, verify=self.verify).content
+        c = self.rs.post(pano_base_url, params=params, files=files, verify=self.verify, timeout=self.timeout).content
         return c
 
 
