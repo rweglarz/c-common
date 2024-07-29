@@ -3,6 +3,8 @@ import argparse
 import base64
 import copy
 import datetime
+import logging
+import logging.handlers
 import json
 from lxml import etree
 from lxml.builder import E
@@ -19,6 +21,8 @@ import xmltodict
 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+logger = logging.getLogger(__name__)
 
 base_params = {
     'key': '',
@@ -61,6 +65,7 @@ def readConfiguration(panorama_creds_file=None):
     print("Using =  {}  = from  {}".format(data["name"], pcf))
     with open(os.path.join(os.path.expanduser("~"), "panorama_config.json")) as f:
         base_config = json.load(f)
+    base_config['panorama_name'] = data["name"]
 
 
 class CustomHttpAdapter(requests.adapters.HTTPAdapter):
@@ -97,11 +102,19 @@ class panoramaRequest:
             self.rs = getLegacySSLRequestsSession()
 
     def get(self, params):
-        c = self.rs.get(pano_base_url, params=params, verify=self.verify, timeout=self.timeout).content
+        try:
+            c = self.rs.get(pano_base_url, params=params, verify=self.verify, timeout=self.timeout).content
+        except requests.ConnectTimeout as e:
+            logger.error('ConnectTimeout')
+            raise e
         return c
 
     def post(self, params, files):
-        c = self.rs.post(pano_base_url, params=params, files=files, verify=self.verify, timeout=self.timeout).content
+        try:
+            c = self.rs.post(pano_base_url, params=params, files=files, verify=self.verify, timeout=self.timeout).content
+        except requests.ConnectTimeout as e:
+            logger.error('ConnectTimeout')
+            raise e
         return c
 
 
@@ -110,7 +123,9 @@ def panoramaCommit():
     params['type'] = 'commit'
     r = etree.Element('commit')
     params['cmd'] = etree.tostring(r)
+    logger.debug(params)
     resp = panoramaRequestGet(params)
+    logger.debug(resp)
     xml_resp = etree.fromstring(resp)
     if not xml_resp.attrib.get('status') == 'success':
         print(resp)
@@ -173,13 +188,15 @@ def waitForJobToFinish(id):
         print(etree.tostring(js, pretty_print=True).decode())
     result = js.find('./result/job/result').text
     job_type = js.find('./result/job/type').text
-    print("Job: {} type: {} result: {}".format(id, job_type, result))
+    job_id = js.find('./result/job/id').text
+    logger.info("Job: {} type: {} result: {}".format(job_id, job_type, result))
+    logger.debug(etree.tostring(js, pretty_print=True).decode())
     for d in js.findall('./result/job/devices/entry'):
         dn = d.find('./devicename').text
         sn = d.find('./serial-no').text
         r = d.find('./result').text
         det_msg = ""
-        print("== {} / {} - {} - {}".format(dn, sn, r, det_msg))
+        logger.info("== {} / {} - {} - {}".format(dn, sn, r, det_msg))
         warnings = []
         ignored = 0
         for l in d.findall('./details/msg/warnings/line'):
@@ -189,9 +206,9 @@ def waitForJobToFinish(id):
                     break
             else:
                 warnings.append(l.text)
-        print("\tWarnings left:{} (and ignored: {})".format(len(warnings), ignored))
+        logger.info("\tWarnings left:{} (and ignored: {})".format(len(warnings), ignored))
         for l in warnings:
-            print("\t\t{}".format(l))
+            logger.info("\t\t{}".format(l))
         errors = []
         ignored = 0
         try:
@@ -205,9 +222,9 @@ def waitForJobToFinish(id):
         except:
             print(etree.tostring(js, pretty_print=True).decode())
             raise Exception("Failed to parse commit message")
-        print("\tErrors left:{} (and ignored: {})".format(len(errors), ignored))
+        logger.info("\tErrors left:{} (and ignored: {})".format(len(errors), ignored))
         for l in errors:
-            print("\t\t{}".format(l))
+            logger.info("\t\t{}".format(l))
     if result != "OK":
         if verbose:
             print(etree.tostring(js, pretty_print=True).decode())
@@ -1447,6 +1464,23 @@ class AzureClient:
         return ips
 
 
+
+def setupLogging(panorama_name):
+    ldate = '%Y-%m-%d %H:%M:%S'
+
+    logger.setLevel(logging.DEBUG)
+
+    lhd = logging.handlers.RotatingFileHandler('/Users/rweglarz/pat-{}.debug'.format(panorama_name), mode='a', maxBytes=10*1024*1024, backupCount=2)
+    lhd.setLevel(logging.DEBUG)
+    lhd.setFormatter(logging.Formatter(fmt='%(asctime)s %(message)s', datefmt=ldate))
+    logging.getLogger().addHandler(lhd)
+
+    lhs = logging.StreamHandler(sys.stdout)
+    lhs.setLevel(logging.INFO)
+    logging.getLogger().addHandler(lhs)
+
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='useful actions on panorama'
@@ -1466,7 +1500,8 @@ def main():
     args = parser.parse_args()
 
     readConfiguration(panorama_creds_file=args.panorama_creds_file)
-    print(args.cmd)
+    setupLogging(base_config['panorama_name'])
+    logger.debug('args: {}'.format(args.cmd))
 
     if args.serial and ',' in args.serial:
         args.serial = args.serial.split(',')
