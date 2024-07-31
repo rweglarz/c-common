@@ -165,6 +165,7 @@ def waitForJobToFinish(id):
         r'Configuration committed successfully',
         r'Local configuration size',
         r'Merged configuration size.local, panorama pushed, predefined.: \d+ MB',
+        r'Maximum recommended merged configuration size: 0 MB .0% configured.',
         r'Panorama connectivity check was successful for .*',
         r'Performing panorama connectivity check .attempt 1 of 1.',
         r'Predefined configuration size: \d+ MB',
