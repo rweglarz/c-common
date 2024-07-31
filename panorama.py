@@ -156,7 +156,8 @@ def getJobStatus(id):
     return xml_resp
 
 
-def waitForJobToFinish(id):
+
+def handleJob(job_result):
     safe_to_ignore_warnings = [
         r'In virtual-router \w+, BGP export policy only_local_prefixes is enabled but not used by any peer-group'
     ]
@@ -170,23 +171,7 @@ def waitForJobToFinish(id):
         r'Performing panorama connectivity check .attempt 1 of 1.',
         r'Predefined configuration size: \d+ MB',
     ]
-    if id == None:
-        print("Job is none")
-        return
-    while True:
-        js = getJobStatus(id)
-        if js.attrib.get('code') == '7':
-            for l in js.findall('./msg/line'):
-                if re.match(r'job \d+ not found', l.text):
-                    raise jobNotFound("")
-            print(etree.tostring(js, pretty_print=True).decode())
-            raise Exception("unknown error")
-        s = js.find('./result/job/status').text
-        if s == "FIN":
-            break
-        time.sleep(5)
-    if verbose:
-        print(etree.tostring(js, pretty_print=True).decode())
+    js = job_result
     result = js.find('./result/job/result').text
     job_type = js.find('./result/job/type').text
     job_id = js.find('./result/job/id').text
@@ -233,6 +218,28 @@ def waitForJobToFinish(id):
             raise commitFailed("")
         else:
             raise jobFailed("")
+
+
+def waitForJobToFinish(id):
+    if id == None:
+        print("Job is none")
+        return
+    while True:
+        js = getJobStatus(id)
+        if js.attrib.get('code') == '7':
+            for l in js.findall('./msg/line'):
+                if re.match(r'job \d+ not found', l.text):
+                    raise jobNotFound("{}".format(id))
+            logger.debug(js)
+            raise Exception("unknown error")
+        s = js.find('./result/job/status').text
+        if s == "FIN":
+            break
+        time.sleep(5)
+    if verbose:
+        print(etree.tostring(js, pretty_print=True).decode())
+    handleJob(js)
+
 
 
 def queryLogs(log_type, query):
