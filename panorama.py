@@ -1186,6 +1186,7 @@ def printSessions(serial, all=False):
         'proto',
         'app',
         'state',
+        'byte-count',
         'rule',
     ]
     if (len(serial)>0):
@@ -1232,6 +1233,7 @@ def printSessions(serial, all=False):
             s['proto'],
             s['application'],
             s['state'],
+            s['total-byte-count'],
             s['security-rule'],
         ]
         if len(serial)>0:
