@@ -1208,15 +1208,21 @@ def printSessions(serial, all=False):
         else:
             nat+= ' o'
         if not all:
-            if s['application'] in ['pan-health-check', 'pan-login', 'ntp-base']:
+            if s['application'] in ['pan-health-check', 'pan-login']:
+                if s['state']=='ACTIVE':
+                    ignored_sessions+= 1
+                    continue
+            elif s['application'] in ['ntp-base']:
                 ignored_sessions+= 1
                 continue
-            if s['source'] in ['168.63.129.16']:
-                ignored_sessions+= 1
-                continue
-            if s['dport'] in ['3978']:
-                ignored_sessions+= 1
-                continue
+            elif s['source'] in ['168.63.129.16']:
+                if s['state']=='ACTIVE':
+                    ignored_sessions+= 1
+                    continue
+            elif s['dport'] in ['3978']:
+                if s['state']=='ACTIVE':
+                    ignored_sessions+= 1
+                    continue
         row = [
             s['idx'],
             '{:22} -> {:22}'.format(o_src_tuple, o_dst_tuple),
