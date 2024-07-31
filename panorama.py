@@ -536,6 +536,7 @@ def enableAutoContentPush():
 
 
 def cleanupDevices(min_time, stable_dgs, todo_dg=None, todo_serial=None):
+    device_found = False
     delicense_jobs = []
     params = copy.copy(base_params)
     r = etree.Element('show')
@@ -549,19 +550,14 @@ def cleanupDevices(min_time, stable_dgs, todo_dg=None, todo_serial=None):
         connected = i_d.find('connected').text
         if todo_serial is not None and todo_serial!=serial:
             continue
-        print()
-        print("== {}".format(serial))
-        if todo_serial is None and connected=="yes":
-            print("Not suitable for delete {}, still connected".format(serial))
-            continue
         dg = getDGOfDevice(serial)
         if dg in stable_dgs:
-            print("Do not delete {} based on dg {} membership".format(serial, dg))
+            logger.debug("Do not delete {} based on dg {} membership".format(serial, dg))
             continue
         if todo_dg is not None:
             if not (todo_dg=='orphaned' and dg is None):
                 if dg!=todo_dg:
-                    print("Do not delete {} different dg {}".format(serial, dg))
+                    logger.debug("Do not delete {} different dg {}".format(serial, dg))
                     continue
         if todo_dg is None and todo_serial is None:
             query = "(description contains '{} connected')".format(serial)
@@ -569,13 +565,18 @@ def cleanupDevices(min_time, stable_dgs, todo_dg=None, todo_serial=None):
             query+= "or (description contains 'successfully authenticated for bootstrapped device {}') ".format(serial)
             logs = queryLogs('system', query)
             if not isDeviceCandidateForRemovalBasedOnHistory(logs, min_time):
-                print("Not suitable for delete {}, too fresh".format(serial))
+                logger.debug("Not suitable for delete {}, too fresh".format(serial))
                 continue
+        if todo_serial is None and connected=="yes":
+            logger.warn("Not suitable for delete {}, still connected".format(serial))
+            continue
         if serial in lic_devs:
-            print("Needs to be delicensed first {}".format(lic_devs[serial]))
+            logger.info("Needs to be delicensed first {}".format(lic_devs[serial]))
             job = delicenseFirewallFromPanorama(serial)
             delicense_jobs.append(job)
+            device_found = True
             continue
+        device_found = True
         ts = getTSOfDeviceFromConfig(serial)
         lcg = getLCGOfDevice(serial)
         print("Will delete {}, dg: {}, ts: {}, lcg: {}".format(serial, dg, ts, lcg))
@@ -587,7 +588,7 @@ def cleanupDevices(min_time, stable_dgs, todo_dg=None, todo_serial=None):
         if lcg:
             deleteDeviceFromLCG(serial, lcg)
         deleteDeviceFromPanoramaDevices(serial)
-    return delicense_jobs
+    return (device_found, delicense_jobs)
 
 
 def commitDevices(entries):
@@ -1587,12 +1588,15 @@ def main():
         else:
             sys.exit(0)
     if args.cmd=="cleanup-devices":
-        delicense_jobs = cleanupDevices(
+        (device_found, delicense_jobs) = cleanupDevices(
             base_config["min_time_for_device_removal"],
             base_config["permanent_device_groups"],
             todo_dg=args.device_group,
             todo_serial=args.serial,
         )
+        if not device_found:
+            logger.error('No devices to delicense found')
+            sys.exit(1)
         print("")
         print("==== First run complete, check delicense jobs")
         for job in delicense_jobs:
