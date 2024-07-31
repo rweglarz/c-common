@@ -1259,28 +1259,59 @@ def printSessions(serial, all=False):
 def executeOpCommand(serial, etree_command):
     params = copy.copy(base_params)
     params['cmd'] = etree.tostring(etree_command)
-    params['target'] = serial
+    if serial is not None:
+        params['target'] = serial
+    logger.debug(etree.tostring(etree_command).decode())
     resp = panoramaRequestGet(params)
-    xml_resp = etree.fromstring(resp)
+    return resp
+
+
+
+def runCommand(serial, command):
+    commands_with_last_element_as_text = [
+      ['clear', 'session', 'all', 'filter', 'destination-port'],
+      ['show', 'interface'],
+      ['show', 'user', 'ts-agent', 'state'],
+      ['show', 'running', 'resource-monitor', 'minute', 'last'],
+      ['show', 'running', 'resource-monitor', 'second', 'last'],
+    ]
+    commands_with_last_element_as_entry = [
+      ['show', 'arp'],
+    ]
+    r = etree.Element(command[0])
+    s = None
+    for i,c in enumerate(command):
+        if s is None:
+            s = r
+            continue
+        if (i+1)==len(command) and command[:-1] in commands_with_last_element_as_text:
+            s.text = c
+        elif (i+1)==len(command) and command[:-1] in commands_with_last_element_as_entry:
+            s = etree.SubElement(s, 'entry')
+            s.attrib['name'] = c
+        else:
+            s = etree.SubElement(s, c)
+    print(etree.tostring(r).decode())
+    resp = executeOpCommand(serial, r)
+    if command and command==['show', 'devices', 'connected']:
+        # workaround
+        resp = re.sub(r'Total Connected Devices: \d+', '', resp.decode())
+    parser = etree.XMLParser(remove_blank_text=True)
+    xml_resp = etree.fromstring(resp, parser)
     print(etree.tostring(xml_resp, pretty_print=True).decode())
 
 
 
 
-
 def clearBGPSessions(serial):
-    params = copy.copy(base_params)
     r = etree.Element('clear')
     s = etree.SubElement(r, 'session')
     s = etree.SubElement(s, 'all')
     s = etree.SubElement(s, 'filter')
     s = etree.SubElement(s, 'destination-port')
     s.text = '179'
-    params['cmd'] = etree.tostring(r)
-    params['target'] = serial
-    resp = panoramaRequestGet(params)
-    xml_resp = etree.fromstring(resp)
-    print(etree.tostring(xml_resp, pretty_print=True).decode())
+    resp = executeOpCommand(serial, r)
+    print(resp)
 
 
 def submitConfigChange(params):
@@ -1513,6 +1544,7 @@ def main():
     parser.add_argument('--query', nargs='?', action='store')
     parser.add_argument('--tag', nargs='?', action='store')
     parser.add_argument('--verbose', action='store_true')
+    parser.add_argument('--command', nargs=argparse.REMAINDER)
     parser.add_argument('cmd')
     args = parser.parse_args()
 
@@ -1680,6 +1712,8 @@ def main():
         s = etree.SubElement(s, 'security-policy')
         executeOpCommand(args.serial, r)
         sys.exit(0)
+    if args.cmd == "command":
+        runCommand(args.serial, args.command)
         sys.exit(0)
     if args.cmd == "block-bgp":
         ipTagMapping("register", args.serial, '0.0.0.0/0', "block-bgp")
