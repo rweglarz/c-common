@@ -23,6 +23,14 @@ resource "panos_panorama_management_profile" "hc_azure" {
   ]
 }
 
+resource "panos_panorama_management_profile" "http" {
+  template = panos_panorama_template.this.name
+
+  name = "http"
+  ping = true
+  http = true
+}
+
 resource "panos_panorama_management_profile" "https" {
   template = panos_panorama_template.this.name
 
