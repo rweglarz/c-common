@@ -101,20 +101,51 @@ class panoramaRequest:
             # SSLError(SSLError(1, '[SSL: UNSAFE_LEGACY_RENEGOTIATION_DISABLED] unsafe legacy renegotiation disabled 
             self.rs = getLegacySSLRequestsSession()
 
-    def get(self, params):
+    def verifyResponse(self, params, response):
+        if not response.attrib.get('status')=='success':
+            if int(response.attrib.get('code'))==13:
+                if re.match(r'.* not connected', response.find('./msg/line').text):
+                    raise deviceNotConnected('Get sessions failed')
+            if int(response.attrib.get('code'))==403 and response.find('./result/msg').text=='API Error: Invalid Credential':
+                logger.error('API Error: Invalid Credential')
+                raise Exception("API Error: Invalid Credential")
+            logger.error('Failed to verify response')
+            logger.error(params)
+            logger.error(etree.tostring(response, pretty_print=True).decode())
+            raise Exception("Failed")
+
+    def get(self, params, returnParsed=False):
         try:
             c = self.rs.get(pano_base_url, params=params, verify=self.verify, timeout=self.timeout).content
         except requests.ConnectTimeout as e:
             logger.error('ConnectTimeout')
             raise e
+        try:
+            xml_resp = etree.fromstring(c)
+        except:
+            logger.error("Failed to parse response:")
+            logger.error(c)
+            raise Exception("Failed to parse response")
+        self.verifyResponse(params, xml_resp)
+        if returnParsed:
+            return xml_resp
         return c
 
-    def post(self, params, files):
+    def post(self, params, files, returnParsed=False):
         try:
             c = self.rs.post(pano_base_url, params=params, files=files, verify=self.verify, timeout=self.timeout).content
         except requests.ConnectTimeout as e:
             logger.error('ConnectTimeout')
             raise e
+        try:
+            xml_resp = etree.fromstring(c)
+        except:
+            logger.error("Failed to parse response:")
+            logger.error(c)
+            raise Exception("Failed to parse response")
+        self.verifyResponse(params, xml_resp)
+        if returnParsed:
+            return xml_resp
         return c
 
 
@@ -609,15 +640,11 @@ def commitDevices(entries):
         for s in entries[dg]:
             se = etree.SubElement(des, 'entry', name=s)
     params['cmd'] = etree.tostring(r)
-    print(params['cmd'])
-    resp = panoramaRequestGet(params)
-    xml_resp = etree.fromstring(resp)
-    if not xml_resp.attrib.get('status') == 'success':
-        print(resp)
-        raise Exception("Failed submit commit")
+    logger.debug(params['cmd'])
+    xml_resp = panoramaRequestGet(params, returnParsed=True)
     msg = xml_resp.find('.//msg').text
     if msg == "There are no changes to commit.":
-        print(msg)
+        logger.info(msg)
         return None
     job = xml_resp.find('.//job').text
     return job
@@ -632,14 +659,9 @@ def commitLCG(lcg):
     elcg = etree.SubElement(elcc, 'log-collector-group')
     elcg.text = lcg
     params['cmd'] = etree.tostring(er)
-    resp = etree.fromstring(panoramaRequestGet(params))
-    xml_resp = etree.fromstring(resp)
-    if not xml_resp.attrib.get('status') == 'success':
-        print(resp)
-        raise Exception("Failed submit commit")
-    msg = xml_resp.find('.//msg')
-    for l in msg.findall('./line'):
-        print(l.text)
+    xml_resp = panoramaRequestGet(params, returnParsed=True)
+    for l in xml_resp.findall('./msg/line'):
+        logger.info(l.text)
     return None
 
 
@@ -983,13 +1005,9 @@ def delicenseFirewallFromPanorama(serial):
     s = etree.SubElement(v, 'mode')
     s.text = 'auto'
     params['cmd'] = etree.tostring(r)
-    resp = panoramaRequestGet(params)
-    xml_resp = etree.fromstring(resp)
-    if not xml_resp.attrib.get('status') == 'success':
-        print(resp)
-        raise Exception("Failed to request delicense for {}".format(serial))
+    xml_resp = panoramaRequestGet(params, returnParsed=True)
     job = xml_resp.find('.//job').text
-    print("Delicense job {} triggered for {}".format(job, serial))
+    logger.info("Delicense job {} triggered for {}".format(job, serial))
     return job
 
 def ipTagMapping(op, serial, ip, tag):
@@ -1013,17 +1031,12 @@ def ipTagMapping(op, serial, ip, tag):
     if serial is not None:
         params['target'] = serial
     files = { 'file': ('file', etree.tostring(um), 'text/xml')}
-    resp = panoramaRequestPost(params, files)
+    panoramaRequestPost(params, files)
     # print(resp.request.headers)
     # print(resp.request.url)
     # print(resp.request.body)
     # print(resp.content)
-    xml_resp = etree.fromstring(resp)
     # print(etree.tostring(xml_resp, pretty_print=True).decode())
-    if not xml_resp.attrib.get('status') == 'success':
-        print(resp)
-        raise Exception(
-            "Ip-tag operation did not succeed: {}".format(resp))
 
 def getIPTagMapping(serial=None, tag='all'):
     iptag = {}
@@ -1168,9 +1181,6 @@ def getSessions(serial):
         print(s)
         print(e)
         return []
-    if int(xd['response']['@code'])==13:
-        if re.match(r'.*not connected', xd['response']['msg']['line']):
-            raise deviceNotConnected('Get sessions failed')
     # print("Response:")
     # print(xd)
     raise Exception("Failed request")
@@ -1315,19 +1325,16 @@ def clearBGPSessions(serial):
 
 
 def submitConfigChange(params):
-    resp = etree.fromstring(panoramaRequestGet(params))
-    rtxt = etree.tostring(resp).decode()
-    if not resp.attrib.get('status') == 'success':
-        print(resp)
-        raise Exception(
-            "Config operation did not succeed: {} {}".format(params['xpath'], rtxt))
-    if resp.attrib.get('code') == '20':
+    xml_resp = panoramaRequestGet(params, returnParsed=True)
+    rtxt = etree.tostring(xml_resp).decode()
+    if xml_resp.attrib.get('code') == '20':
         # success, command succeeded
-        msg = resp.find('msg').text
+        msg = xml_resp.find('msg').text
         if msg == "command succeeded":
             return True
-    raise Exception(
-        "Unknown response for config operation: {} {}".format(params['xpath'], rtxt))
+    logger.error('Unknown response for config operation:')
+    logger.error(rtxt)
+    raise Exception("Unknown response for config operation: {} {}".format(params['xpath'], rtxt))
 
 
 def buildSDWANDeviceConfig(dev_root, props):
