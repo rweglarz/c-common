@@ -409,7 +409,7 @@ def deleteDeviceFromSDWAN(serial):
         params['xpath'] = xpath
         r = doAPIDeleteFromConfig(params, xpath)
         if r:
-            print("{} removed from sdwan cluster {}".format(serial, cluster_name))
+            logger.info("{} removed from sdwan cluster {}".format(serial, cluster_name))
     params = copy.copy(base_params)
     params['type'] = 'config'
     params['action'] = 'delete'
@@ -418,7 +418,7 @@ def deleteDeviceFromSDWAN(serial):
     params['xpath'] = xpath
     r = doAPIDeleteFromConfig(params, xpath)
     if r:
-        print("{} removed from sdwan".format(serial))
+        logger.info("{} removed from sdwan".format(serial))
     return r
 
 
@@ -430,7 +430,7 @@ def deleteDeviceFromDG(serial, dg):
     xpath+= "/device-group/entry[@name='{}']/devices/entry[@name='{}']".format(dg, serial)
     params['xpath'] = xpath
     r = doAPIDeleteFromConfig(params, xpath)
-    print("{} {}removed from dg {}".format(serial, "" if r else "not ", dg))
+    logger.info("{} {}removed from dg {}".format(serial, "" if r else "not ", dg))
     return r
 
 
@@ -456,7 +456,7 @@ def deleteDeviceFromTS(serial, ts):
     xpath+= "/template-stack/entry[@name='{}']/devices/entry[@name='{}']".format(ts, serial)
     params['xpath'] = xpath
     r = doAPIDeleteFromConfig(params, xpath)
-    print("{} {}removed from ts {}".format(serial, "" if r else "not ", ts))
+    logger.info("{} {}removed from ts {}".format(serial, "" if r else "not ", ts))
     return r
 
 
@@ -468,7 +468,7 @@ def deleteDeviceFromLCG(serial, lcg):
     xpath+= "/log-collector-group/entry[@name='{}']/logfwd-setting/devices/entry[@name='{}']".format(lcg, serial)
     params['xpath'] = xpath
     r = doAPIDeleteFromConfig(params, xpath)
-    print("{} {}removed from lcg {}".format(serial, "" if r else "not ", lcg))
+    logger.info("{} {}removed from lcg {}".format(serial, "" if r else "not ", lcg))
     return r
 
 
@@ -479,7 +479,7 @@ def deleteDeviceFromPanoramaDevices(serial):
     xpath = "/config/mgt-config/devices/entry[@name='{}']".format(serial)
     params['xpath'] = xpath
     r = doAPIDeleteFromConfig(params, xpath)
-    print("{} {}removed from panorama device list".format(serial, "" if r else "not "))
+    logger.info("{} {}removed from panorama device list".format(serial, "" if r else "not "))
     return r
 
 
@@ -610,7 +610,7 @@ def cleanupDevices(min_time, stable_dgs, todo_dg=None, todo_serial=None):
         device_found = True
         ts = getTSOfDeviceFromConfig(serial)
         lcg = getLCGOfDevice(serial)
-        print("Will delete {}, dg: {}, ts: {}, lcg: {}".format(serial, dg, ts, lcg))
+        logger.info("Will delete {}, dg: {}, ts: {}, lcg: {}".format(serial, dg, ts, lcg))
         deleteDeviceFromSDWAN(serial)
         if dg:
             deleteDeviceFromDG(serial, dg)
