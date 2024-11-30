@@ -1,4 +1,4 @@
-import os, json, requests, time
+import argparse, json, os, requests, time
 
 sync_url   = "https://service.api.aisecurity.paloaltonetworks.com/v1/scan/sync/request"
 async_url  = "https://service.api.aisecurity.paloaltonetworks.com/v1/scan/async/request"
@@ -38,6 +38,14 @@ def makeSyncRequest(chats):
         recommendedAction = json_data['action']
         print("The recommended action for this prompt is: {}".format(recommendedAction))
         print()
+
+
+def printReportId(report_id):
+    q = {}
+    q["report_ids"] = report_id
+    response = requests.get(report_url, params=q, headers = headers)
+    json_data = json.loads(response.text)
+    print(json.dumps(json_data, indent=4))
 
 
 def makeAsyncReqResp(chats):
@@ -82,12 +90,7 @@ def makeAsyncReqResp(chats):
 
     print()
     print("Aync scan report")
-    q = {}
-    q["report_ids"] = report_id
-    response = requests.get(report_url, params=q, headers = headers)
-    json_data = json.loads(response.text)
-    print(json.dumps(json_data, indent=4))
-    time.sleep(1)
+    printReportId(report_id)
 
 
 def preparations():
@@ -96,6 +99,7 @@ def preparations():
         headers['x-pan-token'] = os.getenv("xpantoken")
     else:
         print("No xpantoken env present")
+
 
 
 if __name__ == "__main__":
@@ -108,6 +112,15 @@ if __name__ == "__main__":
         chats_extra.add_chats_extra(chats)
     except:
         pass
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--report-id', nargs='?', action='store')
+    args = parser.parse_args()
+
+    if args.report_id:
+        printReportId(args.report_id)
+        exit()
+
     print(chats)
     makeSyncRequest(chats)
     makeAsyncReqResp(chats)
