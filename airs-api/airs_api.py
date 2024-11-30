@@ -50,7 +50,7 @@ def printReportId(report_id):
 
 def makeAsyncReqResp(chats):
     print()
-    print("Aync requests")
+    print("Async requests")
     reqs = []
     for chat in chats:
         req = {}
@@ -69,7 +69,7 @@ def makeAsyncReqResp(chats):
         exit(1)
 
     print()
-    print("Aync scan result")
+    print("Async scan result")
     q = {}
     q["scan_ids"] = json_data["scan_id"]
     for count in range(50):
@@ -89,7 +89,7 @@ def makeAsyncReqResp(chats):
         print("Waited long enough, moving on...")
 
     print()
-    print("Aync scan report")
+    print("Async scan report")
     printReportId(report_id)
 
 
