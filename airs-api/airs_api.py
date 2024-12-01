@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse, json, os, requests, time
 
 sync_url   = "https://service.api.aisecurity.paloaltonetworks.com/v1/scan/sync/request"
