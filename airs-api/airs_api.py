@@ -40,12 +40,18 @@ def makeSyncRequest(chats):
         print()
 
 
-def printReportId(report_id):
+def getReportId(report_id):
     q = {}
     q["report_ids"] = report_id
     response = requests.get(report_url, params=q, headers = headers)
-    json_data = json.loads(response.text)
-    print(json.dumps(json_data, indent=4))
+    return json.loads(response.text)
+
+
+def getScanId(scan_id):
+    q = {}
+    q["scan_ids"] = scan_id
+    response = requests.get(scan_url, params=q, headers = headers)
+    return json.loads(response.text)
 
 
 def makeAsyncReqResp(chats):
@@ -70,12 +76,10 @@ def makeAsyncReqResp(chats):
 
     print()
     print("Async scan result")
-    q = {}
-    q["scan_ids"] = json_data["scan_id"]
+    scan_id = json_data["scan_id"]
     for count in range(50):
         time.sleep(0.5)
-        response = requests.get(scan_url, params=q, headers = headers)
-        json_data = json.loads(response.text)
+        json_data = getScanId(scan_id)
         print(count)
         if count==0:
             print(json.dumps(json_data, indent=4))
@@ -90,7 +94,8 @@ def makeAsyncReqResp(chats):
 
     print()
     print("Async scan report")
-    printReportId(report_id)
+    rr = getReportId(report_id)
+    print(json.dumps(rr, indent=4))
 
 
 def preparations():
@@ -115,10 +120,16 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--report-id', nargs='?', action='store')
+    parser.add_argument('--scan-id', nargs='?', action='store')
     args = parser.parse_args()
 
     if args.report_id:
-        printReportId(args.report_id)
+        rr = getReportId(args.report_id)
+        print(json.dumps(rr, indent=4))
+        exit()
+    if args.scan_id:
+        sr = getScanId(args.scan_id)
+        print(json.dumps(sr, indent=4))
         exit()
 
     print(chats)
