@@ -800,6 +800,22 @@ def getTSOfDeviceFromConfig(serial):
     return None
 
 
+def getLCGs():
+    lcgsr = []
+    if not hasattr(getLCGs, "lcgs"):
+        params = copy.copy(base_params)
+        r = etree.Element('show')
+        s = etree.SubElement(r, 'log-collector-group')
+        s = etree.SubElement(s, 'all')
+        params['cmd'] = etree.tostring(r)
+        getLCGs.lcgs =  etree.fromstring(panoramaRequestGet(params=params))
+    lcgs = getLCGs.lcgs
+    for i_lcg in lcgs.findall('./result/log-collector-group/entry'):
+        lcg_name = i_lcg.get('name')
+        lcgsr.append(lcg_name)
+    return lcgsr
+
+
 def getLCGOfDevice(serial):
     if not hasattr(getLCGOfDevice, "lcgs"):
         params = copy.copy(base_params)
@@ -1600,7 +1616,10 @@ def main():
         j = panoramaCommit()
         print("Panorama commit job: {}".format(j))
         waitForJobToFinish(j)
-        commitLCG("cg2")
+        lcgs = getLCGs()
+        for lcg in lcgs:
+            print("Commiting {}".format(lcg))
+            j = commitLCG(lcg)
         sys.exit(0)
     if args.cmd=="commit-all":
         enableAutoContentPush()
