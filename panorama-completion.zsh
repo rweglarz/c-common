@@ -1,7 +1,7 @@
 _panorama() {
   local line state
 
-  #_arguments '1: :(cleanup-devices cleanup-single-device commit commit-all):->cmd'
+  #_arguments '1: :(cleanup-devices cleanup-single-device commit commit-all lll):->cmd'
 
   _arguments -C \
     '1: :->cmds' \

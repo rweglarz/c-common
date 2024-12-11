@@ -1010,7 +1010,7 @@ def delicenseFirewallFromPanorama(serial):
     logger.info("Delicense job {} triggered for {}".format(job, serial))
     return job
 
-def ipTagMapping(op, serial, ip, tag):
+def ipTagMapping(op, serial, ip, tag, timeout=12*3600):
     assert(op in ['register', 'unregister'])
     assert(ip is not None)
     params = copy.copy(base_params)
@@ -1024,7 +1024,7 @@ def ipTagMapping(op, serial, ip, tag):
     e.attrib['persistent'] = "1"
     t = etree.SubElement(e, 'tag')
     m = etree.SubElement(t, 'member')
-    m.attrib['timeout'] = str(12*3600)
+    m.attrib['timeout'] = str(timeout)
     m.text = tag
     # print(etree.tostring(um, pretty_print=True).decode())
     params['type'] = 'user-id'
@@ -1320,6 +1320,17 @@ def clearBGPSessions(serial):
     s = etree.SubElement(s, 'filter')
     s = etree.SubElement(s, 'destination-port')
     s.text = '179'
+    resp = executeOpCommand(serial, r)
+    print(resp)
+
+
+def clearHealthCheckSessions(serial):
+    r = etree.Element('clear')
+    s = etree.SubElement(r, 'session')
+    s = etree.SubElement(s, 'all')
+    s = etree.SubElement(s, 'filter')
+    s = etree.SubElement(s, 'application')
+    s.text = 'pan-health-check'
     resp = executeOpCommand(serial, r)
     print(resp)
 
@@ -1728,6 +1739,13 @@ def main():
         sys.exit(0)
     if args.cmd == "unblock-bgp":
         ipTagMapping("unregister", args.serial, '0.0.0.0/0', "block-bgp")
+        sys.exit(0)
+    if args.cmd == "block-health-check":
+        ipTagMapping("register", args.serial, '0.0.0.0/0', "block-hc", 3600)
+        clearHealthCheckSessions(args.serial)
+        sys.exit(0)
+    if args.cmd == "unblock-health-check":
+        ipTagMapping("unregister", args.serial, '0.0.0.0/0', "block-hc")
         sys.exit(0)
     print("Unrecognized command")
     sys.exit(1)

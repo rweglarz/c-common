@@ -45,7 +45,13 @@ def generate_panos_security_rule_group(rule_count):
            "perf1": {
               "device_group": "${resource.panos_device_group.perf1.name}",
               "position_keyword": "top",
-              "rule": []
+              "rule": [],
+              "depends_on": [
+                 "resource.panos_device_group.perf1",
+              ],
+              "lifecycle": {
+                "create_before_destroy": "true",
+              },
            }
         }
       }
