@@ -575,7 +575,7 @@ def cleanupDevices(min_time, stable_dgs, todo_dg=None, todo_serial=None):
     s = etree.SubElement(s, 'all')
     params['cmd'] = etree.tostring(r)
     resp = etree.fromstring(panoramaRequestGet(params))
-    lic_devs = getSupportPortalLicensedDevices(None)
+    lic_devs = getSupportPortalLicensedDevices()
     for i_d in resp.findall('./result/devices/entry'):
         serial = i_d.find('serial').text
         connected = i_d.find('connected').text
@@ -986,27 +986,33 @@ def getDevicesForCommit(dg=None, ts=None, connected=None, in_sync=None):
             r[dg_name].append(serial)
     return r
 
-def getSupportPortalLicensedDevices(authcode):
+
+def getSupportPortalLicensedDevicesForAuthCode(devices, authcode):
     url = "https://api.paloaltonetworks.com/api/license/get"
     api_key = base_config["license"]["api_key"]
-    if authcode is None:
-        authcode = base_config["license"]["authcode"]
     headers = {
         "apikey": api_key
     }
     data = {
         "authcode": authcode
     }
-    devices = {}
     resp = requests.post(url, data=data, headers=headers, verify=False)
     if resp.status_code!=200:
         print(resp)
         raise Exception("Invalid response: code:{}, {}".format(resp.status_code, resp.content))
     devs = json.loads(resp.content)
     for d in devs['UsedDeviceDetails']:
+        d['authcode'] = authcode
         sn = d.get('SerialNumber')
         devices[sn] = d
+
+
+def getSupportPortalLicensedDevices():
+    devices = {}
+    for authcode in base_config["license"]["authcodes"]:
+      getSupportPortalLicensedDevicesForAuthCode(devices, authcode)
     return devices
+
 
 def delicenseFirewallFromPanorama(serial):
     # request batch license deactivate VM-Capacity devices 007957000352464 mode auto
@@ -1693,7 +1699,7 @@ def main():
         printDevices(connected)
         sys.exit(0)
     if args.cmd=="list-licensed-devices":
-        lic_devs = getSupportPortalLicensedDevices(None)
+        lic_devs = getSupportPortalLicensedDevices()
         serials = []
         if args.not_on_panorama:
             pan_devs = getDevicesForCommit()
