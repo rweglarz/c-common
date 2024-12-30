@@ -1014,6 +1014,48 @@ def getSupportPortalLicensedDevices():
     return devices
 
 
+def getOauthTokenSoftwareFirewallLicensingAPI():
+    url = "https://identity.paloaltonetworks.com/as/token.oauth2"
+    client_id = base_config["license"]["sw_ngfw_licensing_api"]["client_id"]
+    client_secret = base_config["license"]["sw_ngfw_licensing_api"]["client_secret"]
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    data = {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "scope": "fwflex-service",
+        "grant_type": "client_credentials"
+    }
+    resp = requests.post(url, data=data, headers=headers, verify=False)
+    data = json.loads(resp.text)
+    return data["access_token"]
+
+
+def getLicensedDevicesForAuthCodeSoftwareFirewallLicensingAPI(token, devices, authcode):
+    url = "https://api.paloaltonetworks.com/tms/v1/firewallserialnumbers"
+    headers = {
+        "token": token
+    }
+    params = {
+        "auth_code": authcode
+    }
+    resp = requests.get(url, params=params, headers=headers, verify=False)
+    data = json.loads(resp.text)
+    for vm in data["vm_series"]:
+        devices[vm] = {}
+        devices[vm]['authcode'] = authcode
+
+
+def getLicensedDevicesSoftwareFirewallLicensingAPI():
+    devices = {}
+    token = getOauthTokenSoftwareFirewallLicensingAPI()
+    for authcode in base_config["license"]["authcodes"]:
+        getLicensedDevicesForAuthCodeSoftwareFirewallLicensingAPI(token, devices, authcode)
+    print(devices)
+    return devices
+
+
 def delicenseFirewallFromPanorama(serial):
     # request batch license deactivate VM-Capacity devices 007957000352464 mode auto
     params = copy.copy(base_params)
@@ -1711,6 +1753,10 @@ def main():
                     print("{} {}".format(s, lic_devs[s]))
             else:
                 print("{} {}".format(s, lic_devs[s]))
+        sys.exit(0)
+    if args.cmd=="swfw-list-licensed-devices":
+        lic_devs = getLicensedDevicesSoftwareFirewallLicensingAPI()
+        print(lic_devs)
         sys.exit(0)
     if args.cmd=="enable-auto-content-push":
         enableAutoContentPush()
