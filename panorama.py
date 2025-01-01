@@ -1056,7 +1056,6 @@ def getLicensedDevicesSoftwareFirewallLicensingAPI():
     token = getOauthTokenSoftwareFirewallLicensingAPI()
     for authcode in base_config["license"]["authcodes"]:
         getLicensedDevicesForAuthCodeSoftwareFirewallLicensingAPI(token, devices, authcode)
-    print(devices)
     return devices
 
 
@@ -1079,7 +1078,7 @@ def getDeploymentProfilesSoftwareFirewallLicensingAPI():
 
 
 def delicenseFirewallFromPanorama(serial):
-    # request batch license deactivate VM-Capacity devices 007957000352464 mode auto
+    # request batch license deactivate VM-Capacity devices 0079xxxxxxxxxx4 mode auto
     params = copy.copy(base_params)
     r = etree.Element('request')
     s = etree.SubElement(r, 'batch')
@@ -1624,7 +1623,7 @@ def setupLogging(panorama_name):
 
     lhd = logging.handlers.RotatingFileHandler('/Users/rweglarz/pat-{}.debug'.format(panorama_name), mode='a', maxBytes=10*1024*1024, backupCount=2)
     lhd.setLevel(logging.DEBUG)
-    lhd.setFormatter(logging.Formatter(fmt='%(asctime)s %(message)s', datefmt=ldate))
+    lhd.setFormatter(logging.Formatter(fmt='%(asctime)s %(filename)s:%(lineno)d %(message)s', datefmt=ldate))
     logging.getLogger().addHandler(lhd)
 
     lhs = logging.StreamHandler(sys.stdout)
