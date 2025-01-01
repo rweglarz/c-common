@@ -1060,6 +1060,24 @@ def getLicensedDevicesSoftwareFirewallLicensingAPI():
     return devices
 
 
+def getDeploymentProfileSoftwareFirewallLicensingAPI(token, dps, authcode):
+    url = "https://api.paloaltonetworks.com/tms/v1/deploymentProfile/{}".format(authcode)
+    headers = {
+        "token": token
+    }
+    resp = requests.get(url, headers=headers, verify=False)
+    data = json.loads(resp.text)
+    dps[authcode] = data["data"]
+
+
+def getDeploymentProfilesSoftwareFirewallLicensingAPI():
+    token = getOauthTokenSoftwareFirewallLicensingAPI()
+    dps = {}
+    for authcode in base_config["license"]["authcodes"]:
+        getDeploymentProfileSoftwareFirewallLicensingAPI(token, dps, authcode)
+    return dps
+
+
 def delicenseFirewallFromPanorama(serial):
     # request batch license deactivate VM-Capacity devices 007957000352464 mode auto
     params = copy.copy(base_params)
@@ -1760,7 +1778,10 @@ def main():
         sys.exit(0)
     if args.cmd=="swfw-list-licensed-devices":
         lic_devs = getLicensedDevicesSoftwareFirewallLicensingAPI()
-        print(lic_devs)
+        dps = getDeploymentProfilesSoftwareFirewallLicensingAPI()
+        for s in lic_devs:
+            authcode = lic_devs[s]["authcode"]
+            print("{} {} {}".format(s, lic_devs[s]["authcode"], dps[authcode]["profileName"]))
         sys.exit(0)
     if args.cmd=="enable-auto-content-push":
         enableAutoContentPush()
