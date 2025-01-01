@@ -1015,6 +1015,8 @@ def getSupportPortalLicensedDevices():
 
 
 def getOauthTokenSoftwareFirewallLicensingAPI():
+    if hasattr(getOauthTokenSoftwareFirewallLicensingAPI, "token"):
+        return getOauthTokenSoftwareFirewallLicensingAPI.token
     url = "https://identity.paloaltonetworks.com/as/token.oauth2"
     client_id = base_config["license"]["sw_ngfw_licensing_api"]["client_id"]
     client_secret = base_config["license"]["sw_ngfw_licensing_api"]["client_secret"]
@@ -1029,7 +1031,9 @@ def getOauthTokenSoftwareFirewallLicensingAPI():
     }
     resp = requests.post(url, data=data, headers=headers, verify=False)
     data = json.loads(resp.text)
-    return data["access_token"]
+    token = data["access_token"]
+    getOauthTokenSoftwareFirewallLicensingAPI.token = token
+    return token
 
 
 def getLicensedDevicesForAuthCodeSoftwareFirewallLicensingAPI(token, devices, authcode):
