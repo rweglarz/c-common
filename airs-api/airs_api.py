@@ -7,8 +7,6 @@ async_url  = "https://service.api.aisecurity.paloaltonetworks.com/v1/scan/async/
 scan_url   = "https://service.api.aisecurity.paloaltonetworks.com/v1/scan/results"
 report_url = "https://service.api.aisecurity.paloaltonetworks.com/v1/scan/reports"
 
-profile_name = "rwe-airs-api-20241118-allow-all-1"
-
 headers = {
     'x-pan-token': 'fill it in or use xpantoken env value',
     'Content-Type': 'application/json',
@@ -17,7 +15,7 @@ headers = {
 
 base_req = {
     "ai_profile": {
-        "profile_name": profile_name
+        "profile_name": "fill it on or use aiprofilename env value"
     }
 }
 
@@ -100,18 +98,18 @@ def makeAsyncReqResp(chats):
     print(json.dumps(rr, indent=4))
 
 
-def preparations():
+def preparations(args):
     global headers
-    if os.getenv("xpantoken"):
-        headers['x-pan-token'] = os.getenv("xpantoken")
+    if os.getenv("aipantoken"):
+        headers['x-pan-token'] = os.getenv("aipantoken")
     else:
         print("No xpantoken env present")
-
+    if os.getenv("aiprofilename"):
+        base_req["ai_profile"]["profile_name"] = os.getenv("aiprofilename")
 
 
 if __name__ == "__main__":
     chats = {}
-    preparations()
     try:
         import chats_basic
         chats_basic.add_chats_basic(chats)
@@ -121,10 +119,16 @@ if __name__ == "__main__":
         pass
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('--chat', nargs='?', action='store')
+    parser.add_argument('--profile-name', nargs='?', action='store')
     parser.add_argument('--report-id', nargs='?', action='store')
     parser.add_argument('--scan-id', nargs='?', action='store')
     args = parser.parse_args()
 
+    preparations(args)
+
+    if args.profile_name:
+        base_req["ai_profile"]["profile_name"] = args.profile_name
     if args.report_id:
         rr = getReportId(args.report_id)
         print(json.dumps(rr, indent=4))
@@ -134,6 +138,16 @@ if __name__ == "__main__":
         print(json.dumps(sr, indent=4))
         exit()
 
+    if base_req["ai_profile"]["profile_name"]=="":
+        print("Provie profile-name or export aiprofilename env")
+
+    if args.chat:
+        for c in list(chats.keys()):
+            if c!=args.chat:
+                chats.pop(c)
+
     print(chats)
     makeSyncRequest(chats)
-    makeAsyncReqResp(chats)
+
+    if not args.chat:
+        makeAsyncReqResp(chats)
