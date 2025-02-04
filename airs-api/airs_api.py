@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 
-import argparse, json, os, requests, time
+import argparse
+import json
+import os
+import requests
+import time
+
 
 sync_url   = "https://service.api.aisecurity.paloaltonetworks.com/v1/scan/sync/request"
 async_url  = "https://service.api.aisecurity.paloaltonetworks.com/v1/scan/async/request"
