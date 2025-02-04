@@ -128,6 +128,7 @@ if __name__ == "__main__":
     parser.add_argument('--profile-name', nargs='?', action='store')
     parser.add_argument('--report-id', nargs='?', action='store')
     parser.add_argument('--scan-id', nargs='?', action='store')
+    parser.add_argument('--sync', action='store_true')
     args = parser.parse_args()
 
     preparations(args)
@@ -152,7 +153,13 @@ if __name__ == "__main__":
                 chats.pop(c)
 
     print(chats)
-    makeSyncRequest(chats)
+
+    if args.chat or args.sync:
+        makeSyncRequest(chats)
+        exit()
 
     if not args.chat:
         makeAsyncReqResp(chats)
+        exit()
+
+    print("We should not end up here")
