@@ -86,14 +86,10 @@ def makeAsyncReqResp(chats):
         time.sleep(0.5)
         json_data = getScanId(scan_id)
         print(count)
-        if count==0:
-            print(json.dumps(json_data, indent=4))
+        #print(json.dumps(json_data, indent=4))
         if all((v["status"]=="complete") for _,v in enumerate(json_data)):
             print("All complete")
-            if count>0:
-              print(json.dumps(json_data, indent=4))
             break
-        print(".")
     else:
         print("Waited long enough, moving on...")
 
