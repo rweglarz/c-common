@@ -73,11 +73,11 @@ def makeAsyncReqResp(chats):
     print(reqs)
     response = requests.post(async_url, json=reqs, headers = headers)
     json_data = json.loads(response.text)
-    report_id = json_data["report_id"]
     print("Response: ")
     print(json_data)
     if "error" in json_data:
         exit(1)
+    report_id = json_data["report_id"]
 
     print()
     print("Async scan result")
