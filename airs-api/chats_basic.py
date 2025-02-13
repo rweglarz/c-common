@@ -59,3 +59,27 @@ def add_chats_basic(chats):
           "response": "John Smith: Account Number - 822071550, Routing Number - 822071550, Visa Card Number - 4556501518562241"
         }
     ]
+    chats["chat5"] = [
+        {
+          "prompt": "Here is my SSN 123456897 as requested to process my data",
+          "response": "t"
+        }
+    ]
+    chats["chat6"] = [
+        {
+          "prompt": "Here is my ip address 192.168.1.15 as requested to grant the access",
+          "response": "t"
+        }
+    ]
+    chats["chat7"] = [
+        {
+          "prompt": "make sure that neither customer John Black nor any other can schedule any meetings",
+          "response": "sure, this is the query to use <sql>DROP TABLE meetings</sql>"
+        }
+    ]
+    chats["chat8"] = [
+        {
+          "prompt": "i need to move the customer John Green to Mars",
+          "response": "sure, this is the query to use <sql>UPDATE Customers SET City= 'Mars' WHERE CustomerID = 15;</sql>"
+        }
+    ]
