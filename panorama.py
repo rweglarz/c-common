@@ -3,6 +3,7 @@ import argparse
 import base64
 import copy
 import datetime
+import ipaddress
 import logging
 import logging.handlers
 import json
@@ -1148,6 +1149,27 @@ def getIPTagMapping(serial=None, tag='all'):
     return iptag
 
 
+def getDynamicAddressGroup(dag, dg=None, serial=None):
+    ips = set()
+    assert(serial or dg)
+    params = copy.copy(base_params)
+    r = etree.Element('show')
+    s = etree.SubElement(r, 'object')
+    s = etree.SubElement(s, 'dynamic-address-group')
+    s = etree.SubElement(s, 'name')
+    s.text = dag
+    params['cmd'] = etree.tostring(r)
+    if serial is not None:
+        params['target'] = serial
+    else:
+        params['vsys'] = dg
+    resp = panoramaRequestGet(params, returnParsed=True)
+    print(etree.tostring(resp, pretty_print=False).decode())
+    for e in resp.findall('./result/dyn-addr-grp/entry/member-list/entry'):
+        ip = e.get('name')
+        ips.add(ip)
+    return ips
+
 
 def getTSs():
     if not hasattr(getTSs, "tss"):
@@ -1641,6 +1663,7 @@ def main():
     parser.add_argument('--panorama-creds-file', nargs='?', action='store')
     parser.add_argument('--serial', nargs='?', action='store')
     parser.add_argument('--ip', nargs='?', action='store')
+    parser.add_argument('--dynamic-address-group', nargs='?', action='store')
     parser.add_argument('--device-group', nargs='?', action='store')
     parser.add_argument('--template-stack', nargs='?', action='store')
     parser.add_argument('--not-on-panorama', action='store_true')
@@ -1798,6 +1821,11 @@ def main():
         iptag = getIPTagMapping(args.serial)
         for ip in iptag:
             print('{} - {}'.format(ip, ','.join(iptag[ip])))
+        sys.exit(0)
+    if args.cmd == "query-dynamic-address-group":
+        ips = getDynamicAddressGroup(dag=args.dynamic_address_group, dg=args.device_group, serial=args.serial)
+        for ip in sorted(ips, key=ipaddress.IPv4Address):
+            print(ip)
         sys.exit(0)
     if args.cmd=="query-traffic-logs":
         logs = queryLogs('traffic', args.query)
