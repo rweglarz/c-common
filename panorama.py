@@ -1322,9 +1322,17 @@ def printSessions(serial, all=False):
     for s in sessions:
         # print(s)
         o_src_tuple = s['source'] + ':' + s['sport']
-        x_src_tuple = s['xsource'] + ':' + s['xsport']
+        try:
+            # ipv6 sessions do not have these today
+            x_src_tuple = s['xsource'] + ':' + s['xsport']
+        except:
+            x_src_tuple = ''
         o_dst_tuple = s['dst'] + ':' + s['dport']
-        x_dst_tuple = s['xdst'] + ':' + s['xdport']
+        try:
+            # ipv6 sessions do not have these today
+            x_dst_tuple = s['xdst'] + ':' + s['xdport']
+        except:
+            x_dst_tuple = ''
         nat = ''
         if o_src_tuple != x_src_tuple:
             nat+= 'x >'
