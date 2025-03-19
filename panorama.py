@@ -1078,6 +1078,40 @@ def getDeploymentProfilesSoftwareFirewallLicensingAPI():
     return dps
 
 
+def delicenseFirewallWithAuthcodeSoftwareFirewallLicensingAPI(token, authcode, serial):
+    url = "https://api.paloaltonetworks.com/tms/v1/firewall/deactivate"
+    headers = {
+        "token": token
+    }
+    params = {
+        "auth_code": authcode,
+        "serial_numbers": serial
+    }
+    resp = requests.delete(url, params=params, headers=headers, verify=False)
+    data = json.loads(resp.text)
+    if serial in data['failed']:
+        logger.error("Failed to delicense {}, response:{}".format(serial, resp.text))
+        raise Exception("Failed to delicense {}, response:{}".format(serial, resp.text))
+    if serial in data['success']:
+        logger.info("Delicensed firewall {}".format(serial))
+        return True
+    logger.error("Uncertatin result of delicensing {}, response:{}".format(serial, resp.text))
+    raise Exception("Uncertain result of delicensing {}, response:{}".format(serial, resp.text))
+
+
+def delicenseFirewallSoftwareFirewallLicensingAPI(serial, authcode=None):
+    token = getOauthTokenSoftwareFirewallLicensingAPI()
+    if authcode is None:
+        lds = getLicensedDevicesSoftwareFirewallLicensingAPI()
+        try:
+            authcode = lds[serial]["authcode"]
+        except KeyError:
+            logging.error("Firewall {} not found in licensed devices".format(serial))
+            return False
+    delicenseFirewallWithAuthcodeSoftwareFirewallLicensingAPI(token, authcode, serial)
+    return True
+
+
 def delicenseFirewallFromPanorama(serial):
     # request batch license deactivate VM-Capacity devices 0079xxxxxxxxxx4 mode auto
     params = copy.copy(base_params)
@@ -1812,6 +1846,9 @@ def main():
         for s in lic_devs:
             authcode = lic_devs[s]["authcode"]
             print("{} {} {}".format(s, lic_devs[s]["authcode"], dps[authcode]["profileName"]))
+        sys.exit(0)
+    if args.cmd=="swfw-delicense-device":
+        delicenseFirewallSoftwareFirewallLicensingAPI(args.serial, args.authcode)
         sys.exit(0)
     if args.cmd=="enable-auto-content-push":
         enableAutoContentPush()
