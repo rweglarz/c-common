@@ -1429,10 +1429,13 @@ def executeOpCommand(serial, etree_command):
 def runCommand(serial, command):
     commands_with_last_element_as_text = [
       ['clear', 'session', 'all', 'filter', 'destination-port'],
+      ['show', 'dhcp', 'client', 'ipv6', 'pool-details'],
       ['show', 'interface'],
+      ['show', 'session', 'id'],
       ['show', 'user', 'ts-agent', 'state'],
       ['show', 'running', 'resource-monitor', 'minute', 'last'],
       ['show', 'running', 'resource-monitor', 'second', 'last'],
+      ['show', 'logging-status', 'verbose'],
     ]
     commands_with_last_element_as_entry = [
       ['show', 'arp'],
