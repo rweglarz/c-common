@@ -1680,6 +1680,41 @@ class AzureClient:
 
 
 
+def configureAWSPluginMD(md, arn):
+    params = copy.copy(base_params)
+    params['type'] = 'config'
+    params['action'] = 'set'
+    xpath = "/config/devices/entry[@name='localhost.localdomain']"
+    xpath += "/plugins/aws/monitoring-definition"
+    params['xpath'] = xpath
+    mde = etree.Element('entry')
+    mde.attrib['name'] = md
+    e = etree.SubElement(mde, 'notify-group')
+    e.text = 'dummy'
+    e = etree.SubElement(mde, 'iam-role')
+    e.text = 'panorama'
+    e = etree.SubElement(mde, 'role-arn')
+    e.text = arn
+    params['element'] = etree.tostring(mde)
+    print(params)
+    submitConfigChange(params)
+
+
+def configureAWSPluginVPC(md, vpc):
+    params = copy.copy(base_params)
+    params['type'] = 'config'
+    params['action'] = 'set'
+    xpath = "/config/devices/entry[@name='localhost.localdomain']"
+    xpath+=f"/plugins/aws/monitoring-definition/entry[@name='{md}']/vpc-ids"
+    params['xpath'] = xpath
+    vpce = etree.Element('member')
+    vpce.text = vpc
+    params['element'] = etree.tostring(vpce)
+    print(params)
+    submitConfigChange(params)
+
+
+
 def setupLogging(panorama_name):
     ldate = '%Y-%m-%d %H:%M:%S'
 
@@ -1702,6 +1737,7 @@ def main():
     )
     #parser.add_argument('--clean', action='store_true')
     parser.add_argument('--all', action='store_true')
+    parser.add_argument('--arn', nargs='?', action='store')
     parser.add_argument('--panorama-creds-file', nargs='?', action='store')
     parser.add_argument('--serial', nargs='?', action='store')
     parser.add_argument('--ip', nargs='?', action='store')
@@ -1712,6 +1748,7 @@ def main():
     parser.add_argument('--query', nargs='?', action='store')
     parser.add_argument('--tag', nargs='?', action='store')
     parser.add_argument('--verbose', action='store_true')
+    parser.add_argument('--vpc', nargs='?', action='store')
     parser.add_argument('--command', nargs=argparse.REMAINDER)
     parser.add_argument('cmd')
     args = parser.parse_args()
@@ -1735,6 +1772,14 @@ def main():
 
     if args.cmd == "configure-sdwan":
         configureSDWAN()
+        sys.exit(0)
+    if args.cmd == "configure-aws-plugin-md":
+        md = 'mdapi'
+        configureAWSPluginMD(md, args.arn)
+        sys.exit(0)
+    if args.cmd == "configure-aws-plugin-vpc":
+        md = 'mdapi'
+        configureAWSPluginVPC(md, args.vpc)
         sys.exit(0)
     if args.cmd=="assign-ts":
         old_ts = getTSOfDeviceFromConfig(args.serial)
