@@ -1,0 +1,2 @@
+pan-scm-sdk==0.3.22
+PyYAML==6.0.2
