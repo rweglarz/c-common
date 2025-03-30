@@ -1,0 +1,52 @@
+api-test:
+  pre:
+    - name: rwe-pre-rule1
+      source: 
+        - "192.168.1.1/32"
+      destination: 
+        - "192.168.1.2/32"
+      action: "allow"
+    - name: rwe-pre-rule11
+      source: 
+        - "192.168.11.11/32"
+      destination: 
+        - "192.168.11.2/32"
+      action: "allow"
+    - name: rwe-pre-rule2
+      source: 
+        - "192.168.2.1/32"
+      destination: 
+        - "192.168.2.2/32"
+      action: "allow"
+  post:
+    - name: rwe-post-rule5
+      source: 
+        - "192.168.5.1/32"
+      destination: 
+        - "192.168.5.2/32"
+      action: "allow"
+    - name: rwe-post-rule4
+      source: 
+        - "192.168.4.1/32"
+      destination: 
+        - "192.168.4.2/32"
+      action: "allow"
+    - name: rwe-post-rule3
+      source: 
+        - "192.168.3.1/32"
+      destination: 
+        - "192.168.3.2/32"
+      action: "allow"
+    - name: rwe-post-rule2
+      source: 
+        - "192.168.2.1/32"
+      destination: 
+        - "192.168.2.2/32"
+      action: "allow"
+    - name: rwe-post-rule1
+      source: 
+        - "192.168.1.1/32"
+      destination: 
+        - "192.168.1.2/32"
+      action: "allow"
+
