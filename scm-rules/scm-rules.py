@@ -173,7 +173,16 @@ if __name__ == "__main__":
     parser.add_argument('--file', nargs='?', action='store')
     args = parser.parse_args()
 
-    readConfiguration()
+    if os.getenv("SCM_CLIENT_ID") is not None:
+        base_params['client_id']     = os.getenv("SCM_CLIENT_ID")
+        base_params['client_secret'] = os.getenv("SCM_CLIENT_SECRET")
+        base_params['tsg_id']        = os.getenv("SCM_TSG_ID")
+    else:
+        readConfiguration()
+    if not all([base_params['client_id'], base_params['client_secret'], base_params['tsg_id']]):
+        print("Incomplete configuration")
+        exit(1)
+
     print(f"Using file {args.file}")
     rules_from_file = readRules(args.file)
     complete_rules = buildRules(rules_from_file)
