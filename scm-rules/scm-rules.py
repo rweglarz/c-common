@@ -1,4 +1,4 @@
-#!/usr/bin/env python3 
+#!/usr/bin/env python3
 
 import argparse
 import json
@@ -59,13 +59,13 @@ def assembleRule(folder, parameters):
 def buildRules(rules):
     complete_rules = {}
     for folder in rules:
-        print(folder)
+        print(f"building rule content for folder: {folder}")
         complete_rules[folder] = {}
         for rt in ['pre', 'post']:
             complete_rules[folder][rt] = []
             if rt in rules[folder]:
                 for r in rules[folder][rt]:
-                    print(r.get('name'))
+                    # print(r.get('name'))
                     rule = assembleRule(folder, r)
                     complete_rules[folder][rt].append(rule)
     return complete_rules
@@ -189,6 +189,6 @@ if __name__ == "__main__":
 
     for folder in rules_from_file:
         for rt in ['pre', 'post']:
-            print(f"Halding {folder} {rt}")
+            print(f"Handling {folder} {rt}")
             applyRuleSetToSCMFolder(folder, complete_rules)
 
