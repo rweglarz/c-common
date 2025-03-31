@@ -21,11 +21,11 @@ def readConfiguration(scm_creds_file=None):
             pcf = os.path.join(os.path.expanduser("~"), "scm_creds.json")
     with open(pcf) as f:
         data = json.load(f)
-        base_params["tsg_id"]   = data["tsg_id"]
-        base_params["sa_id"]    = data["sa_id"]
-        base_params["sa_pass"]  = data["sa_pass"]
-        base_params["auth_url"] = data["auth_url"]
-        base_params["region"]   = data["region"]
+        base_params["tsg_id"]         = data["tsg_id"]
+        base_params["client_id"]      = data["client_id"]
+        base_params["client_secret"] = data["client_secret"]
+        # base_params["auth_url"]        = data["auth_url"]
+        # base_params["region"]          = data.get("region", "americas")
 
 
 
@@ -122,8 +122,8 @@ def planRuleMoves(required_rules, existing_rules):
 
 def applyRuleSetToSCMFolder(folder, complete_rules):
     client = Scm(
-        client_id=base_params['sa_id'],
-        client_secret=base_params['sa_pass'],
+        client_id=base_params['client_id'],
+        client_secret=base_params['client_secret'],
         tsg_id=base_params['tsg_id']
     )
     required_rules = complete_rules[folder][rt]
