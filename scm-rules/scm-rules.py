@@ -183,7 +183,7 @@ if __name__ == "__main__":
         print("Incomplete configuration")
         exit(1)
 
-    print(f"Using file {args.file}")
+    print(f"Using file {args.file}, TSG {base_params['tsg_id']}")
     rules_from_file = readRules(args.file)
     complete_rules = buildRules(rules_from_file)
 
