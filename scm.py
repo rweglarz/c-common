@@ -113,8 +113,9 @@ def getServiceConnections(token):
 
 
 
-def getServiceConnectionsInsights(token):
-    path = "insights/v3.0/resource/query/sites/sc_list"
+def getPrismaAccessConnectionsInsights(token, connection_type):
+    assert(connection_type in ["sc", "rn"])
+    path = f"insights/v3.0/resource/query/sites/{connection_type}_list"
     data = {
         "filter": {
             "operator": "AND",
@@ -132,20 +133,43 @@ def getServiceConnectionsInsights(token):
     rj = scmPostRequest(token, path, data)
     # print(json.dumps(rj, indent=4))
     data = {}
-    for sc in rj['data']:
-        data[sc['site_name']] = {
-            "source_ip": sc['source_ip'],
-            "site_state_name": sc['site_state_name'],
-            "bgp_site_state_name": sc['bgp_site_state_name'],
+    for conn in rj['data']:
+        data[conn['site_name']] = {
+            "source_ip": conn.get('source_ip', 'Unknown'),
+            "site_state_name": conn.get('site_state_name'),
+            "bgp_site_state_name": conn.get('bgp_site_state_name'),
         }
     return data
 
 
-def printServiceConnectionsInsights():
+def getPrismaAccessConnections():
     token = getAuthToken()
-    jd = getServiceConnectionsInsights(token)
-    for sc,scv in jd.items():
-        print(f"{sc:20} {scv['source_ip']} {scv['site_state_name']} {scv['bgp_site_state_name']}")
+    jd = {}
+    jd['remote_networks'] = getPrismaAccessConnectionsInsights(token, "rn")
+    jd['service_connections'] = getPrismaAccessConnectionsInsights(token, "sc")
+    return jd
+
+def printPrismaAccessConnections(format="terminal"):
+    assert(format in ["json", "terminal"])
+    pac = getPrismaAccessConnections()
+    if format=="terminal":
+        print("Remote networks")
+        for conn,connv in pac['remote_networks'].items():
+            print(f"{conn:20} {connv['source_ip']:16} {connv['site_state_name']:6} {connv['bgp_site_state_name']}")
+        print("Service connections")
+        for conn,connv in pac['service_connections'].items():
+            print(f"{conn:20} {connv['source_ip']:16} {connv['site_state_name']:6} {connv['bgp_site_state_name']}")
+        return
+    if format=="json":
+        jo = {
+            "rn_public_ips": {},
+            "sc_public_ips": {}
+        }
+        for conn,connv in pac['remote_networks'].items():
+            jo['rn_public_ips'][conn] = connv['source_ip']
+        for conn,connv in pac['service_connections'].items():
+            jo['sc_public_ips'][conn] = connv['source_ip']
+        print(json.dumps(jo, indent=1))
 
 
 
@@ -159,6 +183,7 @@ def main():
     )
     # parser.add_argument('--all', action='store_true')
     parser.add_argument('--name', nargs='?', action='store')
+    parser.add_argument('--format', nargs='?', action='store')
     parser.add_argument('cmd')
     args = parser.parse_args()
 
@@ -167,8 +192,8 @@ def main():
         getDevices(token)
         sys.exit(0)
 
-    if args.cmd == "get-service-connections":
-        printServiceConnectionsInsights()
+    if args.cmd == "get-prisma-access-connections":
+        printPrismaAccessConnections(format=args.format)
         sys.exit(0)
 
     print(f"Unknown command {args.cmd}")
