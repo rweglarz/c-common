@@ -5,9 +5,20 @@ import json
 import os
 import requests
 import sys
+import time
+
+from scm.client import Scm
+from scm.exceptions import (
+   InvalidObjectError,
+   NotFoundError,
+   AuthenticationError,
+   ServerError
+)
+
 
 
 base_params = {}
+scm_client = None
 
 
 def readConfiguration(scm_creds_file=None):
@@ -113,9 +124,12 @@ def getServiceConnections(token):
 
 
 
-def getPrismaAccessConnectionsInsights(token, connection_type):
+def getPrismaAccessConnectionsInsights(connection_type):
     assert(connection_type in ["sc", "rn"])
-    path = f"insights/v3.0/resource/query/sites/{connection_type}_list"
+    headers = {
+        "X-PANW-Region": base_params['region']
+    }
+    path = f"/insights/v3.0/resource/query/sites/{connection_type}_list"
     data = {
         "filter": {
             "operator": "AND",
@@ -130,8 +144,7 @@ def getPrismaAccessConnectionsInsights(token, connection_type):
             ]
         }
     }
-    rj = scmPostRequest(token, path, data)
-    # print(json.dumps(rj, indent=4))
+    rj = scm_client.post(endpoint=path, headers=headers, json=data)
     data = {}
     for conn in rj['data']:
         data[conn['site_name']] = {
@@ -143,10 +156,9 @@ def getPrismaAccessConnectionsInsights(token, connection_type):
 
 
 def getPrismaAccessConnections():
-    token = getAuthToken()
     jd = {}
-    jd['remote_networks'] = getPrismaAccessConnectionsInsights(token, "rn")
-    jd['service_connections'] = getPrismaAccessConnectionsInsights(token, "sc")
+    jd['remote_networks'] = getPrismaAccessConnectionsInsights("rn")
+    jd['service_connections'] = getPrismaAccessConnectionsInsights("sc")
     return jd
 
 def printPrismaAccessConnections(format="terminal"):
@@ -175,6 +187,34 @@ def printPrismaAccessConnections(format="terminal"):
 
 
 
+class MScm(Scm):
+    # def __init__(self, length):
+    #     super().__init__(length, length)
+    def aa(self, something):
+        pass
+
+    def commitAll(self, description):
+        try:
+            result = self.commit(folders=["All"], description=description, sync=False)
+        except InvalidObjectError as e:
+            print(f"Invalid commit parameters: {e.message}")
+        except Exception as e:
+            print(result)
+            print(f"Invalid commit: {e.message}")
+        return result.job_id
+    
+    def waitForJobAndChildTasks(self, primary_job_id):
+        jobs_status = {}
+        while True:
+            recent_jobs = scm_client.list_jobs(limit=100)
+            for j in recent_jobs.data:
+                if j.parent_id==primary_job_id or j.id==primary_job_id:
+                    jobs_status[j.id] = j
+            for j in jobs_status.values():
+                print(f"{j.id} {j.result_str}")
+            time.sleep(30)
+
+
 def main():
     readConfiguration()
 
@@ -182,10 +222,18 @@ def main():
         description='useful actions on panorama'
     )
     # parser.add_argument('--all', action='store_true')
+    parser.add_argument('--job', nargs='?', action='store')
     parser.add_argument('--name', nargs='?', action='store')
     parser.add_argument('--format', nargs='?', action='store')
     parser.add_argument('cmd')
     args = parser.parse_args()
+
+    global scm_client
+    scm_client = MScm(
+        client_id=base_params["client_id"],
+        client_secret=base_params["client_secret"],
+        tsg_id=base_params["tsg_id"]
+    )
 
     if args.cmd == "get-devices":
         token = getAuthToken()
@@ -194,6 +242,16 @@ def main():
 
     if args.cmd == "get-prisma-access-connections":
         printPrismaAccessConnections(format=args.format)
+        sys.exit(0)
+
+    if args.cmd == "commit-all-and-wait":
+        job_id = scm_client.commitAll("api commit")
+        print(f"Parent job id: {job_id}")
+        scm_client.waitForJobAndChildTasks(job_id)
+        sys.exit(0)
+
+    if args.cmd == "wait-for-job":
+        scm_client.waitForJobAndChildTasks(args.job)
         sys.exit(0)
 
     print(f"Unknown command {args.cmd}")
