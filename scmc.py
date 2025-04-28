@@ -16,6 +16,7 @@ from scm.exceptions import (
 )
 
 
+COMMIT_ALL_MAX_CHECK_COUNT = 90
 
 base_params = {}
 scm_client = None
@@ -209,14 +210,47 @@ class MScm(Scm):
     
     def waitForJobAndChildTasks(self, primary_job_id):
         jobs_status = {}
-        while True:
-            recent_jobs = scm_client.list_jobs(limit=100)
+        check_number = 0
+        for check_number in range(0, COMMIT_ALL_MAX_CHECK_COUNT):
+            recent_jobs = scm_client.list_jobs(limit=200)
             for j in recent_jobs.data:
                 if j.parent_id==primary_job_id or j.id==primary_job_id:
-                    jobs_status[j.id] = j
+                    if j.id not in jobs_status:
+                        jobs_status[j.id] = {}
+                    jobs_status[j.id]['js'] = j
+                    jobs_status[j.id]['last_seen'] = check_number
+            if len(jobs_status)==0:
+                print(f"Job {primary_job_id} not found")
+                sys.exit(1)
+            s = ""
+            pending_tasks_present = False
+            failed_tasks_present = False
+            status_strings = []
             for j in jobs_status.values():
-                print(f"{j.id} {j.result_str}")
-            time.sleep(30)
+                jid = j['js'].id
+                # if the job is not in the last 100, fetch it individually
+                if j['last_seen']!=check_number:
+                    jsv = scm_client.get_job_status(jid)
+                    jobs_status[jid]['js'] = jsv.data[0]
+                status_strings.append(f"{jid} {j['js'].result_str}")
+                if j['js'].result_str=="PEND":
+                    pending_tasks_present = True
+                if j['js'].result_str=="FAIL":
+                    failed_tasks_present = True
+            s = ", ".join(status_strings)
+            print(f"Jobs status: {s}")
+            if not pending_tasks_present:
+                break
+            time.sleep(60)
+        else:
+            print(f"Reached max check count ${COMMIT_ALL_MAX_CHECK_COUNT}")
+            return 1
+        if not failed_tasks_present:
+            print("No Pending tasks, all completed OK")
+            return 0
+        print("No Pending tasks, some tasks FAILED")
+        return 1
+
 
 
 def main():
@@ -248,6 +282,11 @@ def main():
         printPrismaAccessConnections(format=args.format)
         sys.exit(0)
 
+    if args.cmd == "commit-all":
+        job_id = scm_client.commitAll("api commit")
+        print(job_id)
+        sys.exit(0)
+
     if args.cmd == "commit-all-and-wait":
         job_id = scm_client.commitAll("api commit")
         print(f"Parent job id: {job_id}")
@@ -255,8 +294,8 @@ def main():
         sys.exit(0)
 
     if args.cmd == "wait-for-job":
-        scm_client.waitForJobAndChildTasks(args.job)
-        sys.exit(0)
+        rv = scm_client.waitForJobAndChildTasks(args.job)
+        sys.exit(rv)
 
     print(f"Unknown command {args.cmd}")
 
