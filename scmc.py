@@ -254,7 +254,13 @@ class MScm(Scm):
 
 
 def main():
-    readConfiguration()
+    if os.getenv("SCM_CLIENT_ID") is not None:
+        base_params['client_id']     = os.getenv("SCM_CLIENT_ID")
+        base_params['client_secret'] = os.getenv("SCM_CLIENT_SECRET")
+        base_params['tsg_id']        = os.getenv("SCM_TSG_ID")
+        base_params['region']        = os.getenv("PA_REGION")
+    else:
+        readConfiguration()
 
     parser = argparse.ArgumentParser(
         description='useful actions on panorama'
