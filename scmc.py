@@ -178,8 +178,12 @@ def printPrismaAccessConnections(format="terminal"):
             "sc_public_ips": {}
         }
         for conn,connv in pac['remote_networks'].items():
+            if connv['source_ip']=="Unknown":
+                continue
             jo['rn_public_ips'][conn] = connv['source_ip']
         for conn,connv in pac['service_connections'].items():
+            if connv['source_ip']=="Unknown":
+                continue
             jo['sc_public_ips'][conn] = connv['source_ip']
         print(json.dumps(jo, indent=1))
 
