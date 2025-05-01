@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import logging
 import os
 import requests
 import sys
@@ -9,10 +10,13 @@ import time
 
 from scm.client import Scm
 from scm.exceptions import (
-   InvalidObjectError,
-   NotFoundError,
-   AuthenticationError,
-   ServerError
+    APIError,
+    AuthenticationError,
+    BadRequestError,
+    InvalidObjectError,
+    NotFoundError,
+    ObjectNotPresentError,
+    ServerError,
 )
 
 
@@ -193,21 +197,136 @@ def printPrismaAccessConnections(format="terminal"):
 
 
 class MScm(Scm):
-    # def __init__(self, length):
-    #     super().__init__(length, length)
-    def aa(self, something):
-        pass
+    region = None
+    connectors = None
+    connector_groups = None
+    logger = None
+
+    def __init__(self, **kwargs):
+        self.region = kwargs.pop("region")
+        super().__init__(**kwargs)
+        self.logger = logging.getLogger(__name__)
+
+    def _addRegionHeader(self, **kwargs):
+        assert(self.region)
+        region_header = {
+            "X-PANW-Region": self.region
+        }
+        kwargs["headers"] = kwargs.get("headers", {}) | region_header
+        return kwargs
+
+    def deleteSSE(self, **kwargs):
+        kwargs = self._addRegionHeader(**kwargs)
+        return self.delete(**kwargs)
+
+    def getSSE(self, **kwargs):
+        kwargs = self._addRegionHeader(**kwargs)
+        return self.get(**kwargs)
+
+    def postSSE(self, **kwargs):
+        kwargs = self._addRegionHeader(**kwargs)
+        return self.post(**kwargs)
+
+    def commit(self, description):
+        try:
+            result = super().commit(folders=["All"], description=description, sync=False)
+        except InvalidObjectError as e:
+            self.logger.error(f"Invalid commit parameters: {e.message}")
+        except Exception as e:
+            self.logger.error(f"Invalid commit: {e.message}")
+        else:
+            return result.job_id
 
     def commitAll(self, description):
+        path = "/config/operations/v1/config-versions/candidate:push"
+        data = {
+            "folders": ["All"],
+            "description": description,
+        }
         try:
-            result = self.commit(folders=["All"], description=description, sync=False)
-        except InvalidObjectError as e:
-            print(f"Invalid commit parameters: {e.message}")
-        except Exception as e:
-            print(result)
-            print(f"Invalid commit: {e.message}")
-        return result.job_id
+            r = self.post(endpoint=path, json=data)
+        except BadRequestError as e:
+            self.logger.error(f"Commit attempt failed - BadRequestError")
+            self.logger.error(e)
+            return None
+        if r["success"]!=True:
+            self.logger.error(f"Commit attempt failed - {r}")
+            return
+        return r["job_id"]
+
+    def refreshZTNAConnectors(self):
+        path = f"/sse/connector/v2.0/api/connectors"
+        connectors = self.getSSE(endpoint=path)["data"]
+        self.connectors = {}
+        for c in connectors:
+            self.connectors[c["name"]] = c
+
+    def refreshZTNAConnectorGroups(self):
+        path = f"/sse/connector/v2.0/api/connector-groups"
+        connector_groups = self.getSSE(endpoint=path)["data"]
+        self.connector_groups = {}
+        for cg in connector_groups:
+            self.connector_groups[cg["name"]] = cg
+
+    def refreshZTNAApplications(self):
+        path = f"/sse/connector/v2.0/api/applications"
+        applications = self.getSSE(endpoint=path)["data"]
+        self.applications= {}
+        for app in applications:
+            self.applications[app["name"]] = app
     
+    def createZTNAApplication(self, fqdn, group_id, port="80"):
+        path = f"/sse/connector/v2.0/api/applications"
+        data = {
+            "name": fqdn,
+            "group": group_id,
+            "icmp_allowed": True,
+            "app_enabled": True,
+            "spec": [{
+                "fqdn": fqdn,
+                "tcp_port": port,
+                "probe_port": port,
+                "probe_type": "tcp_ping",
+                "udp_port": "",
+            }]
+        }
+        r = self.postSSE(endpoint=path, json=data)
+        return r["oid"]
+    
+    def deleteZTNAApplication(self, object_id):
+        path = f"/sse/connector/v2.0/api/applications/{object_id}"
+        r = self.deleteSSE(endpoint=path)
+        self.logger.debug(r)
+
+    def deleteZTNAConnector(self, object_id):
+        path = f"/sse/connector/v2.0/api/connectors/{object_id}"
+        r = self.deleteSSE(endpoint=path)
+        self.logger.debug(r)
+
+    def deleteZTNAConnectorGroup(self, object_id):
+        path = f"/sse/connector/v2.0/api/connector-groups/{object_id}"
+        r = self.deleteSSE(endpoint=path)
+        self.logger.debug(r)
+
+    def createZTNAConnector(self, name, group_id):
+        path = f"/sse/connector/v2.0/api/connectors"
+        data = {
+            "name": name,
+            "group": group_id,
+        }
+        r = self.postSSE(endpoint=path, json=data)
+        return r["oid"]
+
+    def createZTNAConnectorGroup(self, name, description):
+        path = f"/sse/connector/v2.0/api/connector-groups"
+        data = {
+            "name": name,
+            "is_autoscale": False,
+            "description": description,
+        }
+        r = self.postSSE(endpoint=path, json=data)
+        return r["oid"]
+
     def waitForJobAndChildTasks(self, primary_job_id):
         jobs_status = {}
         check_number = 0
@@ -276,7 +395,8 @@ def main():
     scm_client = MScm(
         client_id=base_params["client_id"],
         client_secret=base_params["client_secret"],
-        tsg_id=base_params["tsg_id"]
+        tsg_id=base_params["tsg_id"],
+        region=base_params["region"],
     )
 
     if args.cmd == "get-devices":
@@ -288,8 +408,13 @@ def main():
         printPrismaAccessConnections(format=args.format)
         sys.exit(0)
 
+    if args.cmd == "commit":
+        job_id = scm_client.commit("api commit")
+        print(job_id)
+        sys.exit(0)
+
     if args.cmd == "commit-all":
-        job_id = scm_client.commitAll("api commit")
+        job_id = scm_client.commitAll("api commit all")
         print(job_id)
         sys.exit(0)
 
@@ -304,6 +429,7 @@ def main():
         sys.exit(rv)
 
     print(f"Unknown command {args.cmd}")
+    sys.exit(1)
 
 if __name__ == '__main__':
     sys.exit(main())
