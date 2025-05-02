@@ -125,7 +125,7 @@ class ZTNAManager:
         connector_groups_to_create = set(self.zcfg["connector_groups"]).difference(self.scm_client.connector_groups.keys())
         print(f"Need to create {len(connector_groups_to_create)} connector groups")
         for cg in connector_groups_to_create:
-            assert cg in self.connector_groups_to_manage, "About to create a connector group I'm not supposed to manage"
+            assert cg in self.connector_groups_to_manage, f"About to create a connector group {cg} I'm not supposed to manage"
             print(f"Creating {cg}")
             try:
                 desc = self.zcfg["connector_groups"][cg].get("description", "")
@@ -139,7 +139,7 @@ class ZTNAManager:
         connector_groups_to_delete = cg_existing_managed.difference(self.zcfg["connector_groups"])
         print(f"Need to delete {len(connector_groups_to_delete)} connector groups")
         for cg in connector_groups_to_delete:
-            assert cg in self.connector_groups_to_manage, "About to delete a connector group I'm not supposed to manage"
+            assert cg in self.connector_groups_to_manage, f"About to delete a connector group {cg} I'm not supposed to manage"
             print(f"Deleting {cg}")
             oid = self.scm_client.connector_groups[cg]["oid"]
             self.scm_client.deleteZTNAConnectorGroup(oid)
@@ -159,7 +159,7 @@ class ZTNAManager:
             for conn in conns:
                 if conn in self.scm_client.connectors:
                     continue
-                assert conn in self.connectors_to_manage, "About to create a connector I'm not supposed to manage"
+                assert conn in self.connectors_to_manage, f"About to create a connector {conn} I'm not supposed to manage"
                 print(f"Creating connector {conn} in {cg}")
                 cgid = self.scm_client.connector_groups[cg]["oid"]
                 self.scm_client.createZTNAConnector(conn, cgid)
@@ -187,7 +187,7 @@ class ZTNAManager:
                 pass
         for conn in connectors_existing_managed:
             if not conn in connectors_need_to_exist:
-                assert conn in self.connectors_to_manage, "About to delete a connector I'm not supposed to manage"
+                assert conn in self.connectors_to_manage, f"About to delete a connector {conn} I'm not supposed to manage"
                 print(f"Deleting connector {conn}")
                 oid = self.scm_client.connectors[conn]["oid"]
                 self.scm_client.deleteZTNAConnector(oid)
