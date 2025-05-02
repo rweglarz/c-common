@@ -70,8 +70,10 @@ class ZTNAManager:
     connectors_to_manage = [
         "ztna211",
         "ztna212",
+        "ztna213",
         "ztna221",
         "ztna222",
+        "ztna223",
     ]
     app_prefixes_to_manage = [
         "app21",
@@ -144,10 +146,14 @@ class ZTNAManager:
 
     def manage_connectors_create(self):
         cg_existing_managed = set(self.scm_client.connector_groups.keys()).intersection(self.connector_groups_to_manage)
+        new_connectors = []
         for cg in cg_existing_managed:
             try:
                 conns = self.zcfg["connector_groups"][cg]["connectors"]
             except:
+                # no connectors
+                continue
+            if conns is None:
                 # no connectors
                 continue
             for conn in conns:
@@ -157,6 +163,17 @@ class ZTNAManager:
                 print(f"Creating connector {conn} in {cg}")
                 cgid = self.scm_client.connector_groups[cg]["oid"]
                 self.scm_client.createZTNAConnector(conn, cgid)
+                new_connectors.append(conn)
+        self.scm_client.refreshZTNAConnectors()
+        if len(new_connectors)==0:
+            print("No new connectors to create secrets for")
+            return
+        print("Creating secrets")
+        for conn in new_connectors:
+            conn_d = self.scm_client.connectors[conn]
+            print(f"Creating secret for {conn}")
+            self.azure_vault_client.setZTNASecret(conn, conn_d["token_active"], conn_d["token_secret"])
+
 
     def manage_connectors_delete(self):
         connectors_existing_managed = set(self.scm_client.connectors.keys()).intersection(self.connectors_to_manage)
