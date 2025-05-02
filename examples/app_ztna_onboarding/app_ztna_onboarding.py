@@ -87,9 +87,40 @@ class ZTNAManager:
         with open("ztna_config.yaml", "r") as cfg_in:
             self.zcfg = yaml.safe_load(cfg_in)
 
+    def manage_applications_create(self):
+        if self.zcfg["applications"] is None:
+            return
+        applications_to_create = set(self.zcfg["applications"]).difference(self.scm_client.applications.keys())
+        print(f"Need to create {len(applications_to_create)} applications")
+        for app in applications_to_create:
+            for pfx in self.app_prefixes_to_manage:
+                if app.startswith(pfx):
+                    break
+            else:
+                assert False, f"About to create an aplication {app} I'm not supposed to manage"
+            cgids = []
+            print(f"Creating application {app}")
+            for cg in self.zcfg["applications"][app]["connector_groups"]:
+                cgids.append(self.scm_client.connector_groups[cg]["oid"])
+            oidsstr = ",".join(cgids)
+            self.scm_client.createZTNAApplication(app, oidsstr, "80")
+
+    def manage_applications_delete(self):
+        for app in self.scm_client.applications.keys():
+            for pfx in self.app_prefixes_to_manage:
+                if app.startswith(pfx):
+                    break
+            else:
+                # not managed app
+                continue
+            if self.zcfg["applications"] is not None and app in self.zcfg["applications"]:
+                continue
+            print(f"Deleting application {app}")
+            oid = self.scm_client.applications[app]["oid"]
+            self.scm_client.deleteZTNAApplication(oid)
+
     def manage_connector_groups_create(self):
-        cg_existing_managed = set(self.scm_client.connector_groups.keys()).intersection(self.connector_groups_to_manage)
-        connector_groups_to_create = set(self.zcfg["connector_groups"]).difference(cg_existing_managed)
+        connector_groups_to_create = set(self.zcfg["connector_groups"]).difference(self.scm_client.connector_groups.keys())
         print(f"Need to create {len(connector_groups_to_create)} connector groups")
         for cg in connector_groups_to_create:
             assert cg in self.connector_groups_to_manage, "About to create a connector group I'm not supposed to manage"
@@ -152,7 +183,8 @@ class ZTNAManager:
         print(f"we have: {set(self.scm_client.connector_groups.keys())}")
         self.manage_connector_groups_create()
         self.manage_connectors_create()
-        # self.manage_applications()
+        self.manage_applications_create()
+        self.manage_applications_delete()
         self.manage_connectors_delete()
         self.manage_connector_groups_delete()
 
