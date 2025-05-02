@@ -1,0 +1,4 @@
+azure-identity==1.21.0
+azure-keyvault-secrets==4.9.0
+pan-scm-sdk==0.3.25
+pyyaml==6.0.2
