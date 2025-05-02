@@ -12,9 +12,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 from azure.core.exceptions import (
-    ResourceNotFoundError
+    ResourceNotFoundError,
 )
 from scmc import MScm
+from scm.exceptions import (
+    NameNotUniqueError,
+)
+
+SNIPPET = "api-configured"
 
 
 base_params = {}
@@ -93,7 +98,7 @@ class ZTNAManager:
         if self.zcfg["applications"] is None:
             return
         applications_to_create = set(self.zcfg["applications"]).difference(self.scm_client.applications.keys())
-        print(f"Need to create {len(applications_to_create)} applications")
+        print(f"Need to create {len(applications_to_create)} ztna applications")
         for app in applications_to_create:
             for pfx in self.app_prefixes_to_manage:
                 if app.startswith(pfx):
@@ -193,14 +198,76 @@ class ZTNAManager:
                 self.scm_client.deleteZTNAConnector(oid)
 
 
+    def _create_rule_and_address(self, app, source_user, snippet):
+        address = {
+            "snippet": snippet,
+            "name": app,
+            "fqdn": app,
+        }
+        try:
+            print(f"  Creating address for {app}")
+            self.scm_client.address.create(address)
+        except NameNotUniqueError as e:
+            print(f"  Address object {app} already exists")
+        rule = {
+            "snippet": snippet,
+            "name": app,
+            "from_": ["any"],
+            "to_": ["any"],
+            "source": ["any"],
+            "source_user": source_user,
+            "destination": [app],
+            "application": ["any"],
+            "service": ["application-default"],
+            "action": "allow",
+            "category": "any",
+        }
+        print(f"  Creating rule for {app}")
+        self.scm_client.security_rule.create(rule)
+
+    def manage_rules_create(self):
+        if self.zcfg["applications"] is None:
+            return
+        for app,app_def in self.zcfg["applications"].items():
+            source_user = app_def.get('source_user', ["any"])
+            existing_rules = self.scm_client.security_rule.list(snippet=SNIPPET, exact_match=True)
+            for rule in existing_rules:
+                if rule.name==app:
+                    # print(f"Rule for {app} already exists")
+                    break
+            else:
+                print(f" Creating rule and address for {app}")
+                self._create_rule_and_address(app, source_user, SNIPPET)
+        return 
+
+    def manage_rules_delete(self):
+        existing_rules = self.scm_client.security_rule.list(snippet=SNIPPET, exact_match=True)
+        for rule in existing_rules:
+            app = rule.name
+            if app in self.zcfg["applications"]:
+                continue
+            print(f"Deleting rule for app {app}")
+            oid = rule.id
+            self.scm_client.security_rule.delete(object_id=oid)
+        existing_addresses = self.scm_client.address.list(snippet=SNIPPET, exact_match=True)
+        for address in existing_addresses:
+            app = address.name
+            if app in self.zcfg["applications"]:
+                continue
+            print(f"Deleting address object for app {app}")
+            obj = self.scm_client.address.fetch(name=app, snippet=SNIPPET)
+            oid = obj.id
+            self.scm_client.address.delete(object_id=oid)
+
     def go(self):
         self.scm_client.refreshZTNAConnectors()
         self.scm_client.refreshZTNAConnectorGroups()
         self.scm_client.refreshZTNAApplications()
-        print(f"we have: {set(self.scm_client.connector_groups.keys())}")
         self.manage_connector_groups_create()
         self.manage_connectors_create()
         self.manage_applications_create()
+        self.manage_rules_create()
+        self.manage_rules_delete()
         self.manage_applications_delete()
         self.manage_connectors_delete()
         self.manage_connector_groups_delete()
