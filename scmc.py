@@ -364,8 +364,8 @@ class MScm(Scm):
                 print(f"Job {primary_job_id} not found")
                 sys.exit(1)
             s = ""
-            pending_tasks_present = False
-            failed_tasks_present = False
+            pending_tasks_count = 0
+            failed_tasks_count = 0
             status_strings = []
             for j in jobs_status.values():
                 jid = j['js'].id
@@ -375,18 +375,19 @@ class MScm(Scm):
                     jobs_status[jid]['js'] = jsv.data[0]
                 status_strings.append(f"{jid} {j['js'].result_str}")
                 if j['js'].result_str=="PEND":
-                    pending_tasks_present = True
+                    pending_tasks_count += 1
                 if j['js'].result_str=="FAIL":
-                    failed_tasks_present = True
+                    failed_tasks_count += 1
             s = ", ".join(status_strings)
-            print(f"Jobs status: {s}")
-            if not pending_tasks_present:
+            completed_count = len(jobs_status)-pending_tasks_count
+            print(f"Jobs status: {s}, failed:{failed_tasks_count} completed:{completed_count} /{len(jobs_status)}")
+            if pending_tasks_count==0:
                 break
             time.sleep(60)
         else:
             print(f"Reached max check count ${COMMIT_ALL_MAX_CHECK_COUNT}")
             return 1
-        if not failed_tasks_present:
+        if failed_tasks_count==0:
             print("No Pending tasks, all completed OK")
             return 0
         print("No Pending tasks, some tasks FAILED")
@@ -435,6 +436,12 @@ def main():
         print(job_id)
         sys.exit(0)
 
+    if args.cmd == "commit-and-wait":
+        job_id = scm_client.commit("api commit")
+        print(f"Parent job id: {job_id}")
+        rv = scm_client.waitForJobAndChildTasks(job_id)
+        sys.exit(rv)
+
     if args.cmd == "commit-all":
         job_id = scm_client.commitAll("api commit all")
         print(job_id)
@@ -443,8 +450,8 @@ def main():
     if args.cmd == "commit-all-and-wait":
         job_id = scm_client.commitAll("api commit")
         print(f"Parent job id: {job_id}")
-        scm_client.waitForJobAndChildTasks(job_id)
-        sys.exit(0)
+        rv = scm_client.waitForJobAndChildTasks(job_id)
+        sys.exit(rv)
 
     if args.cmd == "wait-for-job":
         rv = scm_client.waitForJobAndChildTasks(args.job)
