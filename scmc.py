@@ -404,7 +404,7 @@ def main():
         readConfiguration()
 
     parser = argparse.ArgumentParser(
-        description='useful actions on panorama'
+        description='useful actions on scm'
     )
     # parser.add_argument('--all', action='store_true')
     parser.add_argument('--job', nargs='?', action='store')

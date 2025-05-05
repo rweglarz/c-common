@@ -111,30 +111,6 @@ class ZTNAManager:
                 cgids.append(self.scm_client.connector_groups[cg]["oid"])
             oidsstr = ",".join(cgids)
             self.scm_client.createZTNAApplication(app, oidsstr, "80")
-        self.scm_client.refreshZTNAApplications()
-
-    def manage_applications_group_assignment(self):
-        if self.zcfg["applications"] is None:
-            return
-        applications = self.zcfg["applications"]
-        print("Verifying applications mapping to connector groups")
-        for app in applications:
-            for pfx in self.app_prefixes_to_manage:
-                if app.startswith(pfx):
-                    break
-            else:
-                assert False, f" About to manage an aplication {app} I'm not supposed to manage"
-            cgids = []
-            print(f" Application {app}")
-            cgs = self.zcfg["applications"][app]["connector_groups"]
-            assert cgs!=None, "Application must be assigned to connector group"
-            for cg in cgs:
-                cgids.append(self.scm_client.connector_groups[cg]["oid"])
-            oidsstr = ",".join(cgids)
-            existing_groups = self.scm_client.applications[app]["group"].split(",")
-            if set(cgids)!=set(existing_groups):
-                print("  different, updating the app")
-                self.scm_client.updateZTNAApplication(self.scm_client.applications[app]["oid"], app, oidsstr, "80")
 
     def manage_applications_delete(self):
         for app in self.scm_client.applications.keys():
@@ -290,7 +266,6 @@ class ZTNAManager:
         self.manage_connector_groups_create()
         self.manage_connectors_create()
         self.manage_applications_create()
-        self.manage_applications_group_assignment()
         self.manage_rules_create()
         self.manage_rules_delete()
         self.manage_applications_delete()
