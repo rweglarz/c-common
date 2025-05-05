@@ -227,6 +227,10 @@ class MScm(Scm):
         kwargs = self._addRegionHeader(**kwargs)
         return self.post(**kwargs)
 
+    def putSSE(self, **kwargs):
+        kwargs = self._addRegionHeader(**kwargs)
+        return self.put(**kwargs)
+
     def commit(self, description):
         try:
             result = super().commit(folders=["All"], description=description, sync=False)
@@ -291,6 +295,24 @@ class MScm(Scm):
             }]
         }
         r = self.postSSE(endpoint=path, json=data)
+        return r["oid"]
+
+    def updateZTNAApplication(self, oid, fqdn, group_id, port="80"):
+        path = f"/sse/connector/v2.0/api/applications/{oid}"
+        data = {
+            "name": fqdn,
+            "group": group_id,
+            "icmp_allowed": True,
+            "app_enabled": True,
+            "spec": [{
+                "fqdn": fqdn,
+                "tcp_port": port,
+                "probe_port": port,
+                "probe_type": "tcp_ping",
+                "udp_port": "",
+            }]
+        }
+        r = self.putSSE(endpoint=path, json=data)
         return r["oid"]
     
     def deleteZTNAApplication(self, object_id):
