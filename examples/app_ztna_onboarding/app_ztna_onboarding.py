@@ -68,14 +68,22 @@ class AzureVaultClient:
 class ZTNAManager:
     connector_groups_to_manage = [
         "Azure-DC21-g1",
+        "Azure-DC21-A",
+        "Azure-DC21-B",
         "Azure-DC21-g2",
+        "Azure-DC22-A",
+        "Azure-DC22-B",
+        "Azure-DC21-empty",
         "Azure-DC22-g1",
         "Azure-DC22-g2",
     ]
     connectors_to_manage = [
         "ztna211",
+        "ztna21-a",
+        "ztna21-b",
+        "ztna22-a",
+        "ztna22-b",
         "ztna212",
-        "ztna213",
         "ztna221",
         "ztna222",
         "ztna223",
@@ -83,6 +91,7 @@ class ZTNAManager:
     app_prefixes_to_manage = [
         "app21",
         "app22",
+        "app23",
     ]
     scm_client = None
     azure_vault_client = None
