@@ -380,7 +380,7 @@ class MScm(Scm):
                     failed_tasks_count += 1
             s = ", ".join(status_strings)
             completed_count = len(jobs_status)-pending_tasks_count
-            print(f"Jobs status: {s}, failed:{failed_tasks_count} completed:{completed_count} /{len(jobs_status)}")
+            print(f"FAIL:{failed_tasks_count} OK:{completed_count} /{len(jobs_status)} -- jobs: {s}")
             if pending_tasks_count==0:
                 break
             time.sleep(60)
