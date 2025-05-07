@@ -66,29 +66,17 @@ class AzureVaultClient:
         self.setSecret(name, json.dumps(value))
 
 class ZTNAManager:
-    connector_groups_to_manage = [
-        "Azure-DC21-g1",
-        "Azure-DC21-A",
-        "Azure-DC21-B",
-        "Azure-DC21-g2",
-        "Azure-DC22-A",
-        "Azure-DC22-B",
-        "Azure-DC21-empty",
-        "Azure-DC22-g1",
-        "Azure-DC22-g2",
+    connector_group_prefixes_to_manage = [
+        "Azure-DC21",
+        "Azure-DC22",
+        "Azure-DC23",
     ]
-    connectors_to_manage = [
-        "ztna211",
-        "ztna21-a",
-        "ztna21-b",
-        "ztna22-a",
-        "ztna22-b",
-        "ztna212",
-        "ztna221",
-        "ztna222",
-        "ztna223",
+    connector_prefixes_to_manage = [
+        "ztna21",
+        "ztna22",
+        "ztna23",
     ]
-    app_prefixes_to_manage = [
+    application_prefixes_to_manage = [
         "app21",
         "app22",
         "app23",
@@ -103,17 +91,42 @@ class ZTNAManager:
         with open("ztna_config.yaml", "r") as cfg_in:
             self.zcfg = yaml.safe_load(cfg_in)
 
+    def is_managed(self, name, prefix_list):
+        for pfx in prefix_list:
+            if name.startswith(pfx):
+                return True
+        return False
+
+    def is_managed_application(self, name):
+        return self.is_managed(name, self.application_prefixes_to_manage)
+
+    def is_managed_connector(self, name):
+        return self.is_managed(name, self.connector_prefixes_to_manage)
+
+    def is_managed_connector_group(self, name):
+        return self.is_managed(name, self.connector_group_prefixes_to_manage)
+
+    def get_existing_managed_connectors(self):
+        l = []
+        for conn in self.scm_client.connectors.keys():
+            if self.is_managed_connector(conn):
+                l.append(conn)
+        return l
+
+    def get_existing_managed_connector_groups(self):
+        l = []
+        for cg in self.scm_client.connector_groups.keys():
+            if self.is_managed_connector_group(cg):
+                l.append(cg)
+        return l
+
     def manage_applications_create(self):
         if self.zcfg["applications"] is None:
             return
         applications_to_create = set(self.zcfg["applications"]).difference(self.scm_client.applications.keys())
         print("Verifying if applications need to be created")
         for app in applications_to_create:
-            for pfx in self.app_prefixes_to_manage:
-                if app.startswith(pfx):
-                    break
-            else:
-                assert False, f"About to create an aplication {app} I'm not supposed to manage"
+            assert self.is_managed_application(app), f"About to create an aplication {app} I'm not supposed to manage"
             cgids = []
             print(f"  Creating application {app}")
             for cg in self.zcfg["applications"][app]["connector_groups"]:
@@ -128,11 +141,7 @@ class ZTNAManager:
         applications = self.zcfg["applications"]
         print("Verifying applications mapping to connector groups")
         for app in applications:
-            for pfx in self.app_prefixes_to_manage:
-                if app.startswith(pfx):
-                    break
-            else:
-                assert False, f" About to manage an aplication {app} I'm not supposed to manage"
+            assert self.is_managed_application(app), f" About to manage an aplication {app} I'm not supposed to manage"
             cgids = []
             cgs = self.zcfg["applications"][app]["connector_groups"]
             assert cgs!=None, "Application must be assigned to connector group"
@@ -147,11 +156,7 @@ class ZTNAManager:
     def manage_applications_delete(self):
         print("Verifying if apps need to be deleted")
         for app in self.scm_client.applications.keys():
-            for pfx in self.app_prefixes_to_manage:
-                if app.startswith(pfx):
-                    break
-            else:
-                # not managed app
+            if not self.is_managed_application(app):
                 continue
             if self.zcfg["applications"] is not None and app in self.zcfg["applications"]:
                 continue
@@ -163,7 +168,7 @@ class ZTNAManager:
         connector_groups_to_create = set(self.zcfg["connector_groups"]).difference(self.scm_client.connector_groups.keys())
         print("Verifying if connector groups need to be created")
         for cg in connector_groups_to_create:
-            assert cg in self.connector_groups_to_manage, f"About to create a connector group {cg} I'm not supposed to manage"
+            assert self.is_managed_connector_group(cg), f"About to create a connector group {cg} I'm not supposed to manage"
             print(f"  Creating {cg}")
             try:
                 desc = self.zcfg["connector_groups"][cg].get("description", "")
@@ -173,17 +178,17 @@ class ZTNAManager:
         self.scm_client.refreshZTNAConnectorGroups()
 
     def manage_connector_groups_delete(self):
-        cg_existing_managed = set(self.scm_client.connector_groups.keys()).intersection(self.connector_groups_to_manage)
-        connector_groups_to_delete = cg_existing_managed.difference(self.zcfg["connector_groups"])
+        cg_existing_managed = self.get_existing_managed_connector_groups()
+        connector_groups_to_delete = set(cg_existing_managed).difference(self.zcfg["connector_groups"])
         print("Verifying if connector groups need to be deleted")
         for cg in connector_groups_to_delete:
-            assert cg in self.connector_groups_to_manage, f"About to delete a connector group {cg} I'm not supposed to manage"
+            assert self.is_managed_connector_group(cg), f"About to delete a connector group {cg} I'm not supposed to manage"
             print(f"  Deleting {cg}")
             oid = self.scm_client.connector_groups[cg]["oid"]
             self.scm_client.deleteZTNAConnectorGroup(oid)
 
     def manage_connectors_create(self):
-        cg_existing_managed = set(self.scm_client.connector_groups.keys()).intersection(self.connector_groups_to_manage)
+        cg_existing_managed = self.get_existing_managed_connector_groups()
         new_connectors = []
         print("Verifying if connectors need to be created")
         for cg in cg_existing_managed:
@@ -198,7 +203,7 @@ class ZTNAManager:
             for conn in conns:
                 if conn in self.scm_client.connectors:
                     continue
-                assert conn in self.connectors_to_manage, f"About to create a connector {conn} I'm not supposed to manage"
+                assert self.is_managed_connector(conn), f"About to create a connector {conn} I'm not supposed to manage"
                 print(f"  Creating connector {conn} in {cg}")
                 cgid = self.scm_client.connector_groups[cg]["oid"]
                 self.scm_client.createZTNAConnector(conn, cgid)
@@ -214,8 +219,8 @@ class ZTNAManager:
 
 
     def manage_connectors_delete(self):
-        connectors_existing_managed = set(self.scm_client.connectors.keys()).intersection(self.connectors_to_manage)
-        cg_existing_managed = set(self.scm_client.connector_groups.keys()).intersection(self.connector_groups_to_manage)
+        connectors_existing_managed = self.get_existing_managed_connectors()
+        cg_existing_managed = self.get_existing_managed_connector_groups()
         connectors_need_to_exist = []
         print("Verifying if connectors need to be deleted")
         for cg in cg_existing_managed:
@@ -226,7 +231,7 @@ class ZTNAManager:
                 pass
         for conn in connectors_existing_managed:
             if not conn in connectors_need_to_exist:
-                assert conn in self.connectors_to_manage, f"About to delete a connector {conn} I'm not supposed to manage"
+                assert self.is_managed_connector(conn), f"About to delete a connector {conn} I'm not supposed to manage"
                 print(f"  Deleting connector {conn}")
                 oid = self.scm_client.connectors[conn]["oid"]
                 self.scm_client.deleteZTNAConnector(oid)
