@@ -21,6 +21,7 @@ from scm.exceptions import (
 
 
 COMMIT_ALL_MAX_CHECK_COUNT = 90
+MAX_ONE_TASK_RETRY = 5
 
 base_params = {}
 scm_client = None
@@ -352,6 +353,7 @@ class MScm(Scm):
     def waitForJobAndChildTasks(self, primary_job_id):
         jobs_status = {}
         check_number = 0
+        only_one_task_retry_count = 0
         for check_number in range(0, COMMIT_ALL_MAX_CHECK_COUNT):
             recent_jobs = scm_client.list_jobs(limit=200)
             for j in recent_jobs.data:
@@ -369,7 +371,7 @@ class MScm(Scm):
             status_strings = []
             for j in jobs_status.values():
                 jid = j['js'].id
-                # if the job is not in the last 100, fetch it individually
+                # if the job is not in the last 200, fetch it individually
                 if j['last_seen']!=check_number:
                     jsv = scm_client.get_job_status(jid)
                     jobs_status[jid]['js'] = jsv.data[0]
@@ -386,8 +388,16 @@ class MScm(Scm):
                 fail_str = ""
             print(f"{fail_str}OK:{completed_count} /{len(jobs_status)} -- jobs: {s}")
             if pending_tasks_count==0:
-                break
-            time.sleep(60)
+                if completed_count>1:
+                    break
+                # only one completed, we might not have child jobs yet
+                only_one_task_retry_count+= 1
+                if only_one_task_retry_count > MAX_ONE_TASK_RETRY:
+                    print(f"Max single job retry reached, aborting")
+                    break
+                if jobs_status[primary_job_id]['js'].type_str != "CommitAndPush":
+                    break
+            time.sleep(45)
         else:
             print(f"Reached max check count ${COMMIT_ALL_MAX_CHECK_COUNT}")
             return 1
