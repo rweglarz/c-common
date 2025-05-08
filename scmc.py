@@ -232,9 +232,11 @@ class MScm(Scm):
         kwargs = self._addRegionHeader(**kwargs)
         return self.put(**kwargs)
 
-    def commit(self, description):
+    def commit(self, folders, description):
+        if len(folders)==0:
+            folders = ["All"]
         try:
-            result = super().commit(folders=["All"], description=description, sync=False)
+            result = super().commit(folders=folders, description=description, sync=False)
         except InvalidObjectError as e:
             self.logger.error(f"Invalid commit parameters: {e.message}")
         except Exception as e:
@@ -425,6 +427,9 @@ def main():
     parser.add_argument('--job', nargs='?', action='store')
     parser.add_argument('--name', nargs='?', action='store')
     parser.add_argument('--format', nargs='?', action='store')
+    parser.add_argument('--rn', action='store_true')
+    parser.add_argument('--mu', action='store_true')
+    parser.add_argument('--folders', nargs='?', action='store')
     parser.add_argument('cmd')
     args = parser.parse_args()
 
@@ -445,13 +450,21 @@ def main():
         printPrismaAccessConnections(format=args.format)
         sys.exit(0)
 
+    folders = []
+    if args.folders:
+        for f in args.folders.split(","):
+            folders.append(f)
+    if args.rn:
+        folders.append("Remote Networks")
+    if args.mu:
+        folders.append("Mobile Users")
     if args.cmd == "commit":
-        job_id = scm_client.commit("api commit")
+        job_id = scm_client.commit(folders, "api commit")
         print(job_id)
         sys.exit(0)
 
     if args.cmd == "commit-and-wait":
-        job_id = scm_client.commit("api commit")
+        job_id = scm_client.commit(folders, "api commit")
         print(f"Parent job id: {job_id}")
         rv = scm_client.waitForJobAndChildTasks(job_id)
         sys.exit(rv)
