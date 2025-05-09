@@ -260,6 +260,8 @@ class ZTNAManager:
             "service": ["application-default"],
             "action": "allow",
             "category": "any",
+            "log_setting": 'Cortex Data Lake',
+            "log_end": True,
             "profile_setting": {
                 "group": ["best-practice"]
             },
