@@ -283,6 +283,23 @@ class ZTNAManager:
                 self._create_rule_and_address(app, source_user, SNIPPET)
         return 
 
+    def manage_rules_update(self):
+        print("Verifying if rules need to be updated")
+        if self.zcfg["applications"] is None:
+            return
+        existing_rules = self.scm_client.security_rule.list(snippet=SNIPPET, exact_match=True)
+        for rule in existing_rules:
+            app = rule.name
+            existing_rule_users = rule.source_user
+            desired_rule_users =  self.zcfg["applications"][app].get('source_user', ["any"])
+            if set(existing_rule_users)==set(desired_rule_users):
+                print(f" {app} is correct")
+                continue
+            print(f" {app} updating")
+            rule.source_user = desired_rule_users
+            self.scm_client.security_rule.update(rule)
+        return
+
     def manage_rules_delete(self):
         print("Verifying if rules need to be deleted")
         existing_rules = self.scm_client.security_rule.list(snippet=SNIPPET, exact_match=True)
@@ -314,6 +331,7 @@ class ZTNAManager:
         self.manage_rules_create()
         self.manage_rules_delete()
         self.manage_applications_delete()
+        self.manage_rules_update()
         self.manage_connectors_delete()
         self.manage_connector_groups_delete()
 
