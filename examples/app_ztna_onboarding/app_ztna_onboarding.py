@@ -88,8 +88,12 @@ class ZTNAManager:
     def __init__(self, scm_client, azure_vault_client):
         self.scm_client = scm_client
         self.azure_vault_client = azure_vault_client
-        with open("ztna_config.yaml", "r") as cfg_in:
-            self.zcfg = yaml.safe_load(cfg_in)
+        try:
+            with open("ztna_config.yaml", "r") as cfg_in:
+                self.zcfg = yaml.safe_load(cfg_in)
+        except yaml.parser.ParserError as e:
+            print("Failed to parse yaml ztna_config file")
+            sys.exit(1)
 
     def is_managed(self, name, prefix_list):
         for pfx in prefix_list:
