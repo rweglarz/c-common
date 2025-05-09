@@ -260,6 +260,9 @@ class ZTNAManager:
             "service": ["application-default"],
             "action": "allow",
             "category": "any",
+            "profile_setting": {
+                "group": ["best-practice"]
+            },
         }
         print(f"  Creating rule for {app}")
         self.scm_client.security_rule.create(rule)
