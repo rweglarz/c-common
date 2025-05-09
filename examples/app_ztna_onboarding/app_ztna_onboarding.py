@@ -359,17 +359,6 @@ def main():
     zm = ZTNAManager(scm_client, azure_vault_client)
     zm.go()
     sys.exit(0)
-    s = "ztna99"
-    try:
-        secret = azure_vault_client.getSecret(s)
-        print(secret.name)
-        print(secret.value)
-    except ResourceNotFoundError as e:
-        print("Not there yet")
-    azure_vault_client.setZTNASecret(s, "aaa", "bbb")
-    secret = azure_vault_client.getSecret(s)
-    print(secret.name)
-    print(secret.value)
 
 
 if __name__ == '__main__':
