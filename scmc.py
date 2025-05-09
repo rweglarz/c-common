@@ -239,15 +239,20 @@ class MScm(Scm):
             result = super().commit(folders=folders, description=description, sync=False)
         except InvalidObjectError as e:
             self.logger.error(f"Invalid commit parameters: {e.message}")
+            return None
         except Exception as e:
             self.logger.error(f"Invalid commit: {e.message}")
+            self.logger.error(f"message: {e.details['message']}")
+            return None
         else:
             return result.job_id
 
-    def commitAll(self, description):
+    def commitAll(self, folders, description):
         path = "/config/operations/v1/config-versions/candidate:push"
+        if len(folders)==0:
+            folders = ["All"]
         data = {
-            "folders": ["All"],
+            "folders": folders,
             "description": description,
         }
         try:
@@ -258,7 +263,7 @@ class MScm(Scm):
             return None
         if r["success"]!=True:
             self.logger.error(f"Commit attempt failed - {r}")
-            return
+            return None
         return r["job_id"]
 
     def refreshZTNAConnectors(self):
@@ -430,6 +435,7 @@ def main():
     parser.add_argument('--rn', action='store_true')
     parser.add_argument('--mu', action='store_true')
     parser.add_argument('--folders', nargs='?', action='store')
+    parser.add_argument('--all-admins', action='store_true')
     parser.add_argument('cmd')
     args = parser.parse_args()
 
@@ -458,31 +464,34 @@ def main():
         folders.append("Remote Networks")
     if args.mu:
         folders.append("Mobile Users")
-    if args.cmd == "commit":
-        job_id = scm_client.commit(folders, "api commit")
-        print(job_id)
-        sys.exit(0)
 
-    if args.cmd == "commit-and-wait":
-        job_id = scm_client.commit(folders, "api commit")
-        print(f"Parent job id: {job_id}")
-        rv = scm_client.waitForJobAndChildTasks(job_id)
-        sys.exit(rv)
+    if args.cmd in ["commit", "commit-and-wait"]:
+        # specific folders (if provided)
+        if args.all_admins:
+            job_id = scm_client.commitAll(folders, "api commit all-admins")
+        else:
+            job_id = scm_client.commit(folders, "api commit one-admin")
+        if not job_id:
+            sys.exit(1)
+        if args.cmd == "commit-and-wait":
+            print(f"Parent job id: {job_id}")
+            rv = scm_client.waitForJobAndChildTasks(job_id)
+            sys.exit(rv)
+        else:
+            print(job_id)
+            sys.exit(0)
 
-    if args.cmd == "commit-all":
-        job_id = scm_client.commitAll("api commit all")
-        print(job_id)
-        sys.exit(0)
-
-    if args.cmd == "commit-all-and-wait":
-        job_id = scm_client.commitAll("api commit")
-        print(f"Parent job id: {job_id}")
-        rv = scm_client.waitForJobAndChildTasks(job_id)
-        sys.exit(rv)
-
-    if args.cmd == "wait-for-job":
-        rv = scm_client.waitForJobAndChildTasks(args.job)
-        sys.exit(rv)
+    if args.cmd in ["commit-all", "commit-all-and-wait"]:
+        # all forders, all admins
+        job_id = scm_client.commitAll(["All"], "api commit all--all-admins")
+        if not job_id:
+            sys.exit(1)
+        if args.cmd == "commit-all-and-wait":
+            rv = scm_client.waitForJobAndChildTasks(job_id)
+            sys.exit(rv)
+        else:
+            print(job_id)
+            sys.exit(0)
 
     print(f"Unknown command {args.cmd}")
     sys.exit(1)
