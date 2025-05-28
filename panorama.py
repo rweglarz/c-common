@@ -1790,6 +1790,7 @@ def main():
         addDeviceToTS(args.serial, args.template_stack)
         sys.exit(0)
     if args.cmd=="commit":
+        enableAutoContentPush()
         j = panoramaCommit()
         print("Panorama commit job: {}".format(j))
         waitForJobToFinish(j)
