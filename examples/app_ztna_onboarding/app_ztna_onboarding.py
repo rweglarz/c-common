@@ -39,6 +39,7 @@ def readConfiguration(scm_creds_file=None):
         base_params["client_secret"] = data["client_secret"]
         base_params["auth_url"] = data["auth_url"]
         base_params["region"] = data["region"]
+        base_params["tsg_v2"] = data.get("tsg_v2", False)
 
 
 
@@ -349,6 +350,7 @@ def main():
         base_params['client_secret'] = os.getenv("SCM_CLIENT_SECRET")
         base_params['tsg_id']        = os.getenv("SCM_TSG_ID")
         base_params['region']        = os.getenv("PA_REGION")
+        base_params['tsg_v2']        = os.getenv("SCM_TSG_V2", False)
     else:
         readConfiguration()
     print(base_params['tsg_id'])
@@ -358,6 +360,7 @@ def main():
         client_secret=base_params["client_secret"],
         tsg_id=base_params["tsg_id"],
         region=base_params["region"],
+        tsg_v2=base_params["tsg_v2"],
     )
     azure_vault_client = AzureVaultClient(os.getenv("AZURE_VAULT_URL"))
     zm = ZTNAManager(scm_client, azure_vault_client)
