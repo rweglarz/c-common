@@ -42,6 +42,7 @@ def readConfiguration(scm_creds_file=None):
         base_params["client_secret"] = data["client_secret"]
         base_params["auth_url"] = data["auth_url"]
         base_params["region"] = data["region"]
+        base_params["tsg_v2"] = data.get("tsg_v2", False)
 
 
 def getAuthToken():
@@ -202,10 +203,15 @@ class MScm(Scm):
     connectors = None
     connector_groups = None
     logger = None
+    tsg_v2 = None
+    sse_base_path = "/sse/connector/v2.0/api"
 
     def __init__(self, **kwargs):
         self.region = kwargs.pop("region")
+        self.tsg_v2 = kwargs.pop("tsg_v2")
         super().__init__(**kwargs)
+        if self.tsg_v2:
+            self.sse_base_path = "/sse/connector/2/v2.0/api"
         self.logger = logging.getLogger(__name__)
 
     def _addRegionHeader(self, **kwargs):
@@ -267,28 +273,28 @@ class MScm(Scm):
         return r["job_id"]
 
     def refreshZTNAConnectors(self):
-        path = f"/sse/connector/v2.0/api/connectors"
+        path = f"{self.sse_base_path}/connectors"
         connectors = self.getSSE(endpoint=path)["data"]
         self.connectors = {}
         for c in connectors:
             self.connectors[c["name"]] = c
 
     def refreshZTNAConnectorGroups(self):
-        path = f"/sse/connector/v2.0/api/connector-groups"
+        path = f"{self.sse_base_path}/connector-groups"
         connector_groups = self.getSSE(endpoint=path)["data"]
         self.connector_groups = {}
         for cg in connector_groups:
             self.connector_groups[cg["name"]] = cg
 
     def refreshZTNAApplications(self):
-        path = f"/sse/connector/v2.0/api/applications"
+        path = f"{self.sse_base_path}/applications"
         applications = self.getSSE(endpoint=path)["data"]
         self.applications= {}
         for app in applications:
             self.applications[app["name"]] = app
     
     def createZTNAApplication(self, fqdn, group_id, port="80"):
-        path = f"/sse/connector/v2.0/api/applications"
+        path = f"{self.sse_base_path}/applications"
         data = {
             "name": fqdn,
             "group": group_id,
@@ -306,7 +312,7 @@ class MScm(Scm):
         return r["oid"]
 
     def updateZTNAApplication(self, oid, fqdn, group_id, port="80"):
-        path = f"/sse/connector/v2.0/api/applications/{oid}"
+        path = f"{self.sse_base_path}/applications/{oid}"
         data = {
             "name": fqdn,
             "group": group_id,
@@ -324,22 +330,22 @@ class MScm(Scm):
         return r["oid"]
     
     def deleteZTNAApplication(self, object_id):
-        path = f"/sse/connector/v2.0/api/applications/{object_id}"
+        path = f"{self.sse_base_path}/applications/{object_id}"
         r = self.deleteSSE(endpoint=path)
         self.logger.debug(r)
 
     def deleteZTNAConnector(self, object_id):
-        path = f"/sse/connector/v2.0/api/connectors/{object_id}"
+        path = f"{self.sse_base_path}/connectors/{object_id}"
         r = self.deleteSSE(endpoint=path)
         self.logger.debug(r)
 
     def deleteZTNAConnectorGroup(self, object_id):
-        path = f"/sse/connector/v2.0/api/connector-groups/{object_id}"
+        path = f"{self.sse_base_path}/connector-groups/{object_id}"
         r = self.deleteSSE(endpoint=path)
         self.logger.debug(r)
 
     def createZTNAConnector(self, name, group_id):
-        path = f"/sse/connector/v2.0/api/connectors"
+        path = f"{self.sse_base_path}/connectors"
         data = {
             "name": name,
             "group": group_id,
@@ -348,7 +354,7 @@ class MScm(Scm):
         return r["oid"]
 
     def createZTNAConnectorGroup(self, name, description):
-        path = f"/sse/connector/v2.0/api/connector-groups"
+        path = f"{self.sse_base_path}/connector-groups"
         data = {
             "name": name,
             "is_autoscale": False,
@@ -422,6 +428,7 @@ def main():
         base_params['client_secret'] = os.getenv("SCM_CLIENT_SECRET")
         base_params['tsg_id']        = os.getenv("SCM_TSG_ID")
         base_params['region']        = os.getenv("PA_REGION")
+        base_params['tsg_v2']        = os.getenv("SCM_TSG_V2", False)
     else:
         readConfiguration()
 
@@ -445,6 +452,7 @@ def main():
         client_secret=base_params["client_secret"],
         tsg_id=base_params["tsg_id"],
         region=base_params["region"],
+        tsg_v2=base_params["tsg_v2"],
     )
 
     if args.cmd == "get-devices":
