@@ -130,6 +130,22 @@ def getServiceConnections(token):
         print(json.dumps(rj, indent=4))
 
 
+def getPrismaAccessBandwidthAllocations():
+    path = f"/sse/config/v1/bandwidth-allocations"
+    rj = scm_client.get(endpoint=path)
+    return rj
+
+def printPrismaAccessBandwidthAllocations(format="terminal"):
+    assert(format in ["json", "terminal"])
+    pab = getPrismaAccessBandwidthAllocations()
+    if format=="terminal":
+        for regionv in pab['data']:
+            print(f"{regionv['name']:30} bandwith {regionv['allocated_bandwidth']}")
+            for spn in regionv['spn_name_list']:
+                print(f"   {spn}")
+    else:
+        return pab
+
 
 def getPrismaAccessConnectionsInsights(connection_type):
     assert(connection_type in ["sc", "rn"])
@@ -461,6 +477,10 @@ def main():
     if args.cmd == "get-devices":
         token = getAuthToken()
         getDevices(token)
+        sys.exit(0)
+
+    if args.cmd == "get-prisma-access-bandwidth-allocations":
+        printPrismaAccessBandwidthAllocations(format=args.format)
         sys.exit(0)
 
     if args.cmd == "get-prisma-access-connections":
