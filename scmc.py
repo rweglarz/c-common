@@ -455,6 +455,9 @@ def main():
         tsg_v2=base_params["tsg_v2"],
     )
 
+    if not args.format:
+        args.format = "terminal"
+
     if args.cmd == "get-devices":
         token = getAuthToken()
         getDevices(token)
