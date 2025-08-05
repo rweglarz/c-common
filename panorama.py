@@ -62,7 +62,8 @@ class CustomHttpAdapter(requests.adapters.HTTPAdapter):
 #region class Panorama
 class Panorama:
     rs = None
-    verify = True
+    ssl_verify = True
+    cached = {}
 
     def _getLegacySSLRequestsSession(self):
         ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
@@ -81,9 +82,9 @@ class Panorama:
         api_key -- api key
         panorama_name -- name of the panorama - for display/printing/logging
         """
-        self.verify = ssl_verify
+        self.ssl_verify = ssl_verify
         self.timeout = (10, 60)   # connect, read
-        if self.verify:
+        if self.ssl_verify:
             self.rs = requests.session()
         else:
             # SSLError(SSLError(1, '[SSL: UNSAFE_LEGACY_RENEGOTIATION_DISABLED] unsafe legacy renegotiation disabled 
@@ -105,7 +106,7 @@ class Panorama:
 
     def get(self, params, returnParsed=False):
         try:
-            c = self.rs.get(pano_base_url, params=params, verify=self.verify, timeout=self.timeout).content
+            c = self.rs.get(pano_base_url, params=params, verify=self.ssl_verify, timeout=self.timeout).content
         except requests.ConnectTimeout as e:
             logger.error('ConnectTimeout')
             raise e
@@ -126,7 +127,7 @@ class Panorama:
 
     def post(self, params, files, returnParsed=False):
         try:
-            c = self.rs.post(pano_base_url, params=params, files=files, verify=self.verify, timeout=self.timeout).content
+            c = self.rs.post(pano_base_url, params=params, files=files, verify=self.ssl_verify, timeout=self.timeout).content
         except requests.ConnectTimeout as e:
             logger.error('ConnectTimeout')
             raise e
@@ -144,6 +145,232 @@ class Panorama:
         if returnParsed:
             return xml_resp
         return c
+
+
+    def doAPIDeleteFromConfig(self, params, xpath):
+        resp = etree.fromstring(panoramaRequestGet(params))
+        rtxt = etree.tostring(resp).decode()
+        if not resp.attrib.get('status') == 'success':
+            print(etree.tostring(resp, pretty_print=True).decode())
+            raise Exception("Delete operation did not succeed: {} {}".format(xpath, rtxt))
+        if resp.attrib.get('code') == '20':
+            # success, command succeeded
+            msg = resp.find('msg').text
+            if msg=="command succeeded":
+                return True
+        if resp.attrib.get('code') == '7':
+            msg = resp.find('msg').text
+            if msg=="Object doesn't exist":
+                return False
+            if msg=="No object to delete in delete handler":
+                #this can happen when dg was deleted, show device group still shows the list 
+                return False
+        raise Exception("Unknown response for delete operation: {} {}".format(xpath, rtxt))
+
+
+    def getDGConfig(self):
+        """Grabs the XML of the whole device-group subtree
+        """
+        if "DGConfig" in self.cached and self.cached['DGConfig'] is not None:
+            return self.cached['DGConfig']
+        params = copy.copy(base_params)
+        params['type'] = 'config'
+        params['action'] = 'get'
+        xpath = "/config/devices/entry[@name='localhost.localdomain']/device-group"
+        params['xpath'] = xpath
+        dgc = etree.fromstring(panoramaRequestGet(params=params))
+        self.cached['DGConfig'] = dgc
+        return dgc
+
+
+    def getRuleBase(self, dg, ruleset, rulebase_type):
+        dgc = self.getDGConfig()
+        return dgc.find(f"./result/device-group/entry[@name='{dg}']/{rulebase_type}/{ruleset}/rules")
+
+
+    def findDeviceInRulebase(self, rules, serial):
+        rules_with_serial = []
+        for i_r in rules.findall('./entry'):
+            rule = i_r.get('name')
+            firewalls = []
+            for v in i_r.findall('./target/devices/entry'):
+                firewalls.append(v.get('name'))
+            if serial in firewalls:
+                rules_with_serial.append(rule)
+        return rules_with_serial
+
+
+    def getDeviceGroups(self):
+        dgs = []
+        params = copy.copy(base_params)
+        r = etree.Element('show')
+        s = etree.SubElement(r, 'devicegroups')
+        params['cmd'] = etree.tostring(r)
+        edgs = etree.fromstring(panoramaRequestGet(params=params))
+        for i_dg in edgs.findall('./result/devicegroups/entry'):
+            dg_name = i_dg.get('name')
+            dgs.append(dg_name)
+        return dgs
+
+
+    def cleanupDeviceFromRulebases(self, serial):
+        dgs = self.getDeviceGroups()
+        for dg in dgs:
+            for rb in ['pre-rulebase', 'post-rulebase']:
+                if dg!="aws-gwlb":
+                    continue
+                rules = self.getRuleBase(dg, 'nat', rb)
+                if rules is None:
+                    continue
+                rules_with_device = self.findDeviceInRulebase(rules, serial)
+                for r in rules_with_device:
+                    self.deleteRule(dg, 'nat', rb, r)
+
+
+    def cleanupDevices(self, min_time, stable_dgs, todo_dg=None, todo_serial=None):
+        device_found = False
+        delicense_jobs = []
+        params = copy.copy(base_params)
+        r = etree.Element('show')
+        s = etree.SubElement(r, 'devices')
+        s = etree.SubElement(s, 'all')
+        params['cmd'] = etree.tostring(r)
+        resp = etree.fromstring(panoramaRequestGet(params))
+        lic_devs = getSupportPortalLicensedDevices()
+        for i_d in resp.findall('./result/devices/entry'):
+            serial = i_d.find('serial').text
+            connected = i_d.find('connected').text
+            if todo_serial is not None and todo_serial!=serial:
+                continue
+            dg = getDGOfDevice(serial)
+            if dg in stable_dgs:
+                logger.debug("Do not delete {} based on dg {} membership".format(serial, dg))
+                continue
+            if todo_dg is not None:
+                if not (todo_dg=='orphaned' and dg is None):
+                    if dg!=todo_dg:
+                        logger.debug("Do not delete {} different dg {}".format(serial, dg))
+                        continue
+            if todo_dg is None and todo_serial is None:
+                query = "(description contains '{} connected')".format(serial)
+                query+= "or (description contains '{} disconnected') ".format(serial)
+                query+= "or (description contains 'successfully authenticated for bootstrapped device {}') ".format(serial)
+                logs = queryLogs('system', query)
+                if not isDeviceCandidateForRemovalBasedOnHistory(logs, min_time):
+                    logger.debug("Not suitable for delete {}, too fresh".format(serial))
+                    continue
+            if todo_serial is None and connected=="yes":
+                logger.warn("Not suitable for delete {}, still connected".format(serial))
+                continue
+            if serial in lic_devs:
+                logger.info("Needs to be delicensed first {}".format(lic_devs[serial]))
+                job = delicenseFirewallFromPanorama(serial)
+                delicense_jobs.append(job)
+                device_found = True
+                continue
+            device_found = True
+            ts = getTSOfDeviceFromConfig(serial)
+            lcg = getLCGOfDevice(serial)
+            logger.info("Will delete {}, dg: {}, ts: {}, lcg: {}".format(serial, dg, ts, lcg))
+            self.deleteDeviceFromSDWAN(serial)
+            self.cleanupDeviceFromRulebases(serial)
+            if dg:
+                self.deleteDeviceFromDG(serial, dg)
+            if ts:
+                self.deleteDeviceFromTS(serial, ts)
+            if lcg:
+                self.deleteDeviceFromLCG(serial, lcg)
+            self.deleteDeviceFromPanoramaDevices(serial)
+        return (device_found, delicense_jobs)
+
+
+    def deleteDeviceFromDG(self, serial, dg):
+        params = copy.copy(base_params)
+        params['type'] = 'config'
+        params['action'] = 'delete'
+        xpath = "/config/devices/entry[@name='localhost.localdomain']"
+        xpath+= "/device-group/entry[@name='{}']/devices/entry[@name='{}']".format(dg, serial)
+        params['xpath'] = xpath
+        r = self.doAPIDeleteFromConfig(params, xpath)
+        logger.info("{} {}removed from dg {}".format(serial, "" if r else "not ", dg))
+        return r
+
+
+    def deleteDeviceFromLCG(self, serial, lcg):
+        params = copy.copy(base_params)
+        params['type'] = 'config'
+        params['action'] = 'delete'
+        xpath = "/config/devices/entry[@name='localhost.localdomain']"
+        xpath+= "/log-collector-group/entry[@name='{}']/logfwd-setting/devices/entry[@name='{}']".format(lcg, serial)
+        params['xpath'] = xpath
+        r = self.doAPIDeleteFromConfig(params, xpath)
+        logger.info("{} {}removed from lcg {}".format(serial, "" if r else "not ", lcg))
+        return r
+    
+
+    def deleteDeviceFromSDWAN(self, serial):
+        (fw_type, cluster_name) = findSDWANClusterForDevice(serial)
+        if cluster_name:
+            params = copy.copy(base_params)
+            params['type'] = 'config'
+            params['action'] = 'delete'
+            xpath = "/config/devices/entry[@name='localhost.localdomain']"
+            xpath += "/plugins/sd_wan/vpn-cluster/entry[@name='{}']".format(cluster_name)
+            xpath += "/{}/entry[@name='{}']".format(fw_type, serial)
+            params['xpath'] = xpath
+            r = self.doAPIDeleteFromConfig(params, xpath)
+            if r:
+                logger.info("{} removed from sdwan cluster {}".format(serial, cluster_name))
+        params = copy.copy(base_params)
+        params['type'] = 'config'
+        params['action'] = 'delete'
+        xpath = "/config/devices/entry[@name='localhost.localdomain']"
+        xpath+= "/plugins/sd_wan/devices/entry[@name='{}']".format(serial)
+        params['xpath'] = xpath
+        r = self.doAPIDeleteFromConfig(params, xpath)
+        if r:
+            logger.info("{} removed from sdwan".format(serial))
+        return r
+
+
+    def deleteDeviceFromTS(self, serial, ts):
+        params = copy.copy(base_params)
+        params['type'] = 'config'
+        params['action'] = 'delete'
+        xpath = "/config/devices/entry[@name='localhost.localdomain']"
+        xpath+= "/template-stack/entry[@name='{}']/devices/entry[@name='{}']".format(ts, serial)
+        params['xpath'] = xpath
+        r = self.doAPIDeleteFromConfig(params, xpath)
+        logger.info("{} {}removed from ts {}".format(serial, "" if r else "not ", ts))
+        return r
+
+
+    def deleteDeviceFromPanoramaDevices(self, serial):
+        params = copy.copy(base_params)
+        params['type'] = 'config'
+        params['action'] = 'delete'
+        xpath = "/config/mgt-config/devices/entry[@name='{}']".format(serial)
+        params['xpath'] = xpath
+        r = self.doAPIDeleteFromConfig(params, xpath)
+        logger.info("{} {}removed from panorama device list".format(serial, "" if r else "not "))
+        return r
+
+
+    def deleteRule(self, dg, ruleset, rulebase_type, rule):
+        params = copy.copy(base_params)
+        params['type'] = 'config'
+        params['action'] = 'delete'
+        xpath = "/config/devices/entry[@name='localhost.localdomain']"
+        xpath+= f"/device-group/entry[@name='{dg}']/{rulebase_type}/{ruleset}/rules/entry[@name='{rule}']"
+        params['xpath'] = xpath
+        r = self.doAPIDeleteFromConfig(params, xpath)
+        if r:
+            logger.warning(f"Rule {rule} removed from {dg} {ruleset} {rulebase_type}")
+        else:
+            logger.error(f"Failed to delete rule {rule} from {dg} {ruleset} {rulebase_type}")
+        return r
+
+
 #endregion
    
 
@@ -343,26 +570,6 @@ def isDeviceCandidateForRemovalBasedOnHistory(logs, min_time):
     return False
 
 
-def doAPIDeleteFromConfig(params, xpath):
-    resp = etree.fromstring(panoramaRequestGet(params))
-    rtxt = etree.tostring(resp).decode()
-    if not resp.attrib.get('status') == 'success':
-        print(etree.tostring(resp, pretty_print=True).decode())
-        raise Exception("Delete operation did not succeed: {} {}".format(xpath, rtxt))
-    if resp.attrib.get('code') == '20':
-        # success, command succeeded
-        msg = resp.find('msg').text
-        if msg=="command succeeded":
-            return True
-    if resp.attrib.get('code') == '7':
-        msg = resp.find('msg').text
-        if msg=="Object doesn't exist":
-            return False
-        if msg=="No object to delete in delete handler":
-            #this can happen when dg was deleted, show device group still shows the list 
-            return True
-    raise Exception("Unknown response for delete operation: {} {}".format(xpath, rtxt))
-
 
 def testXMLAESubinterface():
     params = copy.copy(base_params)
@@ -421,43 +628,6 @@ def findSDWANClusterForDevice(serial):
     return (None, None)
 
 
-def deleteDeviceFromSDWAN(serial):
-    (fw_type, cluster_name) = findSDWANClusterForDevice(serial)
-    if cluster_name:
-        params = copy.copy(base_params)
-        params['type'] = 'config'
-        params['action'] = 'delete'
-        xpath = "/config/devices/entry[@name='localhost.localdomain']"
-        xpath += "/plugins/sd_wan/vpn-cluster/entry[@name='{}']".format(cluster_name)
-        xpath += "/{}/entry[@name='{}']".format(fw_type, serial)
-        params['xpath'] = xpath
-        r = doAPIDeleteFromConfig(params, xpath)
-        if r:
-            logger.info("{} removed from sdwan cluster {}".format(serial, cluster_name))
-    params = copy.copy(base_params)
-    params['type'] = 'config'
-    params['action'] = 'delete'
-    xpath = "/config/devices/entry[@name='localhost.localdomain']"
-    xpath+= "/plugins/sd_wan/devices/entry[@name='{}']".format(serial)
-    params['xpath'] = xpath
-    r = doAPIDeleteFromConfig(params, xpath)
-    if r:
-        logger.info("{} removed from sdwan".format(serial))
-    return r
-
-
-def deleteDeviceFromDG(serial, dg):
-    params = copy.copy(base_params)
-    params['type'] = 'config'
-    params['action'] = 'delete'
-    xpath = "/config/devices/entry[@name='localhost.localdomain']"
-    xpath+= "/device-group/entry[@name='{}']/devices/entry[@name='{}']".format(dg, serial)
-    params['xpath'] = xpath
-    r = doAPIDeleteFromConfig(params, xpath)
-    logger.info("{} {}removed from dg {}".format(serial, "" if r else "not ", dg))
-    return r
-
-
 def addDeviceToTS(serial, ts):
     params = copy.copy(base_params)
     params['type'] = 'config'
@@ -471,40 +641,6 @@ def addDeviceToTS(serial, ts):
     submitConfigChange(params)
     print("{} added to ts {}".format(serial, ts))
 
-
-def deleteDeviceFromTS(serial, ts):
-    params = copy.copy(base_params)
-    params['type'] = 'config'
-    params['action'] = 'delete'
-    xpath = "/config/devices/entry[@name='localhost.localdomain']"
-    xpath+= "/template-stack/entry[@name='{}']/devices/entry[@name='{}']".format(ts, serial)
-    params['xpath'] = xpath
-    r = doAPIDeleteFromConfig(params, xpath)
-    logger.info("{} {}removed from ts {}".format(serial, "" if r else "not ", ts))
-    return r
-
-
-def deleteDeviceFromLCG(serial, lcg):
-    params = copy.copy(base_params)
-    params['type'] = 'config'
-    params['action'] = 'delete'
-    xpath = "/config/devices/entry[@name='localhost.localdomain']"
-    xpath+= "/log-collector-group/entry[@name='{}']/logfwd-setting/devices/entry[@name='{}']".format(lcg, serial)
-    params['xpath'] = xpath
-    r = doAPIDeleteFromConfig(params, xpath)
-    logger.info("{} {}removed from lcg {}".format(serial, "" if r else "not ", lcg))
-    return r
-
-
-def deleteDeviceFromPanoramaDevices(serial):
-    params = copy.copy(base_params)
-    params['type'] = 'config'
-    params['action'] = 'delete'
-    xpath = "/config/mgt-config/devices/entry[@name='{}']".format(serial)
-    params['xpath'] = xpath
-    r = doAPIDeleteFromConfig(params, xpath)
-    logger.info("{} {}removed from panorama device list".format(serial, "" if r else "not "))
-    return r
 
 
 def configureAzureResourceGroupInTemplate(template, resource_group):
@@ -589,61 +725,6 @@ def enableAutoContentPush():
         print("Enabling auto content push on: {}".format(ts_name))
         enableAutoContentPushOnTS(ts_name)
 
-
-def cleanupDevices(min_time, stable_dgs, todo_dg=None, todo_serial=None):
-    device_found = False
-    delicense_jobs = []
-    params = copy.copy(base_params)
-    r = etree.Element('show')
-    s = etree.SubElement(r, 'devices')
-    s = etree.SubElement(s, 'all')
-    params['cmd'] = etree.tostring(r)
-    resp = etree.fromstring(panoramaRequestGet(params))
-    lic_devs = getSupportPortalLicensedDevices()
-    for i_d in resp.findall('./result/devices/entry'):
-        serial = i_d.find('serial').text
-        connected = i_d.find('connected').text
-        if todo_serial is not None and todo_serial!=serial:
-            continue
-        dg = getDGOfDevice(serial)
-        if dg in stable_dgs:
-            logger.debug("Do not delete {} based on dg {} membership".format(serial, dg))
-            continue
-        if todo_dg is not None:
-            if not (todo_dg=='orphaned' and dg is None):
-                if dg!=todo_dg:
-                    logger.debug("Do not delete {} different dg {}".format(serial, dg))
-                    continue
-        if todo_dg is None and todo_serial is None:
-            query = "(description contains '{} connected')".format(serial)
-            query+= "or (description contains '{} disconnected') ".format(serial)
-            query+= "or (description contains 'successfully authenticated for bootstrapped device {}') ".format(serial)
-            logs = queryLogs('system', query)
-            if not isDeviceCandidateForRemovalBasedOnHistory(logs, min_time):
-                logger.debug("Not suitable for delete {}, too fresh".format(serial))
-                continue
-        if todo_serial is None and connected=="yes":
-            logger.warn("Not suitable for delete {}, still connected".format(serial))
-            continue
-        if serial in lic_devs:
-            logger.info("Needs to be delicensed first {}".format(lic_devs[serial]))
-            job = delicenseFirewallFromPanorama(serial)
-            delicense_jobs.append(job)
-            device_found = True
-            continue
-        device_found = True
-        ts = getTSOfDeviceFromConfig(serial)
-        lcg = getLCGOfDevice(serial)
-        logger.info("Will delete {}, dg: {}, ts: {}, lcg: {}".format(serial, dg, ts, lcg))
-        deleteDeviceFromSDWAN(serial)
-        if dg:
-            deleteDeviceFromDG(serial, dg)
-        if ts:
-            deleteDeviceFromTS(serial, ts)
-        if lcg:
-            deleteDeviceFromLCG(serial, lcg)
-        deleteDeviceFromPanoramaDevices(serial)
-    return (device_found, delicense_jobs)
 
 
 def commitDevices(entries):
