@@ -48,27 +48,6 @@ class deviceNotConnected(Exception):
     pass
 
 
-def readConfiguration(panorama_creds_file=None):
-    global pano_base_url
-    global base_config
-
-    if panorama_creds_file:
-        pcf = panorama_creds_file
-    else:
-        if os.path.isfile("panorama_creds.json"):
-            pcf = os.path.join("panorama_creds.json")
-        else:
-            pcf = os.path.join(os.path.expanduser("~"), "panorama_creds.json")
-    with open(pcf) as f:
-        data = json.load(f)
-        base_params["key"] = data["api_key"]
-        pano_base_url = 'https://{}/api/'.format(data['hostname'])
-    print("Using =  {}  = from  {}".format(data["name"], pcf))
-    with open(os.path.join(os.path.expanduser("~"), "panorama_config.json")) as f:
-        base_config = json.load(f)
-    base_config['panorama_name'] = data["name"]
-
-
 class CustomHttpAdapter(requests.adapters.HTTPAdapter):
     def __init__(self, ssl_context=None, **kwargs):
         self.ssl_context = ssl_context
@@ -80,27 +59,36 @@ class CustomHttpAdapter(requests.adapters.HTTPAdapter):
             block=block, ssl_context=self.ssl_context)
 
 
-def getLegacySSLRequestsSession():
-    ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-    ctx.check_hostname = False
-    # ctx.verify_mode = ssl.CERT_NONE
-    ctx.options |= 0x4  # OP_LEGACY_SERVER_CONNECT
-    #ctx.options |= ssl.OP_LEGACY_SERVER_CONNECT in 3.12?
-    session = requests.session()
-    session.mount('https://', CustomHttpAdapter(ctx))
-    return session
-
-class panoramaRequest:
+#region class Panorama
+class Panorama:
     rs = None
     verify = True
-    def __init__(self, verify=True):
-        self.verify = verify
+
+    def _getLegacySSLRequestsSession(self):
+        ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+        ctx.check_hostname = False
+        # ctx.verify_mode = ssl.CERT_NONE
+        ctx.options |= 0x4  # OP_LEGACY_SERVER_CONNECT
+        #ctx.options |= ssl.OP_LEGACY_SERVER_CONNECT in 3.12?
+        session = requests.session()
+        session.mount('https://', CustomHttpAdapter(ctx))
+        return session
+
+    def __init__(self, hostname, api_key, panorama_name, ssl_verify=True):
+        """
+        Keyword arguments:
+        hostname -- ip or fqdn
+        api_key -- api key
+        panorama_name -- name of the panorama - for display/printing/logging
+        """
+        self.verify = ssl_verify
         self.timeout = (10, 60)   # connect, read
         if self.verify:
             self.rs = requests.session()
         else:
             # SSLError(SSLError(1, '[SSL: UNSAFE_LEGACY_RENEGOTIATION_DISABLED] unsafe legacy renegotiation disabled 
-            self.rs = getLegacySSLRequestsSession()
+            self.rs = self._getLegacySSLRequestsSession()
+        pass
 
     def verifyResponse(self, params, response):
         if not response.attrib.get('status')=='success':
@@ -127,7 +115,11 @@ class panoramaRequest:
             logger.error("Failed to parse response:")
             logger.error(c)
             raise Exception("Failed to parse response")
-        self.verifyResponse(params, xml_resp)
+        try:
+            self.verifyResponse(params, xml_resp)
+        except Exception as e:
+            logger.debug(c)
+            raise e
         if returnParsed:
             return xml_resp
         return c
@@ -144,10 +136,41 @@ class panoramaRequest:
             logger.error("Failed to parse response:")
             logger.error(c)
             raise Exception("Failed to parse response")
-        self.verifyResponse(params, xml_resp)
+        try:
+            self.verifyResponse(params, xml_resp)
+        except Exception as e:
+            logger.debug(c)
+            raise e
         if returnParsed:
             return xml_resp
         return c
+#endregion
+   
+
+def readConfiguration(panorama_creds_file=None):
+    global pano_base_url
+    global base_config
+
+    if panorama_creds_file:
+        pcf = panorama_creds_file
+    else:
+        if os.path.isfile("panorama_creds.json"):
+            pcf = os.path.join("panorama_creds.json")
+        else:
+            pcf = os.path.join(os.path.expanduser("~"), "panorama_creds.json")
+    with open(pcf) as f:
+        data = json.load(f)
+        base_params["key"] = data["api_key"]
+        base_params["hostname"] = data["api_key"]
+        pano_base_url = 'https://{}/api/'.format(data['hostname'])
+    print("Using =  {}  = from  {}".format(data["name"], pcf))
+    with open(os.path.join(os.path.expanduser("~"), "panorama_config.json")) as f:
+        base_config = json.load(f)
+    base_config['panorama_name'] = data["name"]
+
+
+
+
 
 
 def panoramaCommit():
@@ -1767,7 +1790,7 @@ def main():
         global verbose
         verbose = True
 
-    pr = panoramaRequest(verify=False)
+    pr = Panorama(base_params['hostname'], base_params['key'], base_config['panorama_name'], ssl_verify=False)
     global panoramaRequestGet
     panoramaRequestGet = pr.get
     global panoramaRequestPost
