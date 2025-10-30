@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import uuid
 import json
 import os
 import requests
@@ -29,12 +30,17 @@ base_req = {
 def makeSyncRequest(chats, print_report):
     print()
     print("Sync requests")
+    muuid = str(uuid.uuid4())
+    print(f"UUID: {muuid}")
     for chat in chats:
         print(chat)
         req = dict(base_req)
         req["contents"] = chats[chat]
-        req["tr_id"] = chat
-        print(chats[chat][0]["prompt"])
+        req["tr_id"] = f"{muuid}-{chat}"
+        try:
+            print(chats[chat][0]["prompt"])
+        except:
+            pass
         response = requests.post(sync_url, json = req, headers = headers)
         json_data = json.loads(response.text)
         print(json.dumps(json_data, indent=4))
@@ -67,12 +73,14 @@ def makeAsyncReqResp(chats):
     print()
     print("Async requests")
     reqs = []
+    muuid = str(uuid.uuid4())
+    print(f"UUID: {muuid}")
     for chat in chats:
         req = {}
         req["req_id"] = len(reqs)
         req["scan_req"] = dict(base_req)
         req["scan_req"]["contents"] = chats[chat]
-        req["scan_req"]["tr_id"] = chat
+        req["scan_req"]["tr_id"] = f"{muuid}-{chat}"
         reqs.append(req)
     print(reqs)
     response = requests.post(async_url, json=reqs, headers = headers)
