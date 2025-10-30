@@ -26,7 +26,7 @@ base_req = {
 
 
 
-def makeSyncRequest(chats):
+def makeSyncRequest(chats, print_report):
     print()
     print("Sync requests")
     for chat in chats:
@@ -43,6 +43,10 @@ def makeSyncRequest(chats):
         recommendedAction = json_data['action']
         print("The recommended action for this prompt is: {}".format(recommendedAction))
         print()
+        if print_report:
+            print("====== report")
+            rr = getReportId(json_data["report_id"])
+            print(json.dumps(rr[0], indent=4))
 
 
 def getReportId(report_id):
@@ -123,6 +127,7 @@ if __name__ == "__main__":
     parser.add_argument('--chat', nargs='?', action='store')
     parser.add_argument('--profile-name', nargs='?', action='store')
     parser.add_argument('--report-id', nargs='?', action='store')
+    parser.add_argument('--report', action='store_true')
     parser.add_argument('--scan-id', nargs='?', action='store')
     parser.add_argument('--sync', action='store_true')
     args = parser.parse_args()
@@ -151,7 +156,7 @@ if __name__ == "__main__":
     print(chats)
 
     if args.chat or args.sync:
-        makeSyncRequest(chats)
+        makeSyncRequest(chats, args.report)
         exit()
 
     if not args.chat:
