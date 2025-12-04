@@ -35,16 +35,17 @@ def makeSyncRequest(chats, print_report):
     for chat in chats:
         print(chat)
         req = dict(base_req)
-        req["contents"] = chats[chat]
+        req["contents"] = [ chats[chat]["msgs"] ]
         req["tr_id"] = f"{muuid}-{chat}"
         try:
-            print(chats[chat][0]["prompt"])
+            print(chats[chat]["msgs"]["prompt"])
         except:
             pass
         response = requests.post(sync_url, json = req, headers = headers)
         json_data = json.loads(response.text)
         print(json.dumps(json_data, indent=4))
-        if "error" in json_data:
+        if (response.status_code!=200) or ("error" in json_data):
+            print(response.status_code)
             exit(1)
         recommendedAction = json_data['action']
         print("The recommended action for this prompt is: {}".format(recommendedAction))
@@ -53,6 +54,7 @@ def makeSyncRequest(chats, print_report):
             print("====== report")
             rr = getReportId(json_data["report_id"])
             print(json.dumps(rr[0], indent=4))
+        return json_data
 
 
 def getReportId(report_id):
