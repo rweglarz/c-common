@@ -4,6 +4,7 @@ import argparse
 import uuid
 import json
 import os
+import re
 import requests
 import time
 
@@ -54,7 +55,10 @@ def makeSyncRequest(chats, print_report):
             print("====== report")
             rr = getReportId(json_data["report_id"])
             print(json.dumps(rr[0], indent=4))
-        return json_data
+        json_data["prompt"] = chats[chat]["msgs"].get("prompt", "")
+        json_data["response"] = chats[chat]["msgs"].get("resposne", "")
+        results[chat] = json_data
+    return results
 
 
 def getReportId(report_id):
@@ -81,7 +85,7 @@ def makeAsyncReqResp(chats):
         req = {}
         req["req_id"] = len(reqs)
         req["scan_req"] = dict(base_req)
-        req["scan_req"]["contents"] = chats[chat]
+        req["scan_req"]["contents"] = [chats[chat]["msgs"]]
         req["scan_req"]["tr_id"] = f"{muuid}-{chat}"
         reqs.append(req)
     print(reqs)
@@ -97,7 +101,7 @@ def makeAsyncReqResp(chats):
     print("Async scan result")
     scan_id = json_data["scan_id"]
     for count in range(50):
-        time.sleep(0.5)
+        time.sleep(1.5)
         json_data = getScanId(scan_id)
         print(count)
         if "error" in json_data:
@@ -163,17 +167,21 @@ if __name__ == "__main__":
 
     if args.chat:
         for c in list(chats.keys()):
-            if c!=args.chat:
+            if c!=args.chat and not re.search(args.chat, c):
                 chats.pop(c)
 
     print(chats)
 
-    if args.chat or args.sync:
-        makeSyncRequest(chats, args.report)
+    if args.sync:
+        r = makeSyncRequest(chats, args.report)
+        for k in r:
+            prompt = r[k]["prompt"]
+            if len(prompt)>90:
+                prompt = prompt[:87] + '...'
+            print(f"{k:12} {r[k]["action"]} {prompt}")
         exit()
 
-    if not args.chat:
-        makeAsyncReqResp(chats)
-        exit()
+    makeAsyncReqResp(chats)
+    exit()
 
     print("We should not end up here")
