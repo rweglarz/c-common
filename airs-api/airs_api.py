@@ -56,7 +56,7 @@ def makeSyncRequest(chats, print_report):
             rr = getReportId(json_data["report_id"])
             print(json.dumps(rr[0], indent=4))
         json_data["prompt"] = chats[chat]["msgs"].get("prompt", "")
-        json_data["response"] = chats[chat]["msgs"].get("resposne", "")
+        json_data["response"] = chats[chat]["msgs"].get("response", "")
         results[chat] = json_data
     return results
 
