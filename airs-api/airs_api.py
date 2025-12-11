@@ -81,12 +81,15 @@ def makeAsyncReqResp(chats):
     reqs = []
     muuid = str(uuid.uuid4())
     print(f"UUID: {muuid}")
-    for chat in chats:
+    tr_id_to_chat = {}
+    for idx, chat in enumerate(chats):
         req = {}
-        req["req_id"] = len(reqs)
+        req["req_id"] = idx
         req["scan_req"] = dict(base_req)
         req["scan_req"]["contents"] = [chats[chat]["msgs"]]
-        req["scan_req"]["tr_id"] = f"{muuid}-{chat}"
+        tr_id = f"{muuid}-{chat}"
+        req["scan_req"]["tr_id"] = tr_id
+        tr_id_to_chat[tr_id] = chat
         reqs.append(req)
     print(reqs)
     response = requests.post(async_url, json=reqs, headers = headers)
@@ -102,13 +105,13 @@ def makeAsyncReqResp(chats):
     scan_id = json_data["scan_id"]
     for count in range(50):
         time.sleep(1.5)
-        json_data = getScanId(scan_id)
+        result = getScanId(scan_id)
         print(count)
-        if "error" in json_data:
+        if "error" in result:
             print("error found")
-            print(json.dumps(json_data, indent=4))
+            print(json.dumps(result, indent=4))
             exit(1)
-        if all((v["status"]=="complete") for _,v in enumerate(json_data)):
+        if all((v["status"]=="complete") for _,v in enumerate(result)):
             print("All complete")
             break
     else:
@@ -118,6 +121,18 @@ def makeAsyncReqResp(chats):
     print("Async scan report")
     rr = getReportId(report_id)
     print(json.dumps(rr, indent=4))
+
+    results = {}
+    for report in result:
+        tr_id = report["result"].get("tr_id")
+        if tr_id in tr_id_to_chat:
+            chat = tr_id_to_chat[tr_id]
+            results[chat] = report["result"]
+            results[chat]["prompt"] = chats[chat]["msgs"].get("prompt", "")
+            results[chat]["response"] = chats[chat]["msgs"].get("response", "")
+        else:
+            print(f"Warning: could not find chat for tr_id {tr_id}")
+    return results
 
 
 def preparations(args):
@@ -174,14 +189,14 @@ if __name__ == "__main__":
 
     if args.sync:
         r = makeSyncRequest(chats, args.report)
-        for k in r:
-            prompt = r[k]["prompt"]
-            if len(prompt)>90:
-                prompt = prompt[:87] + '...'
-            print(f"{k:12} {r[k]["action"]} {prompt}")
-        exit()
+    else:
+        r = makeAsyncReqResp(chats)
 
-    makeAsyncReqResp(chats)
+    for k in r:
+        prompt = r[k]["prompt"]
+        if len(prompt)>90:
+            prompt = prompt[:87] + '...'
+        print(f"{k:12} {r[k]["action"]} {prompt}")
     exit()
 
     print("We should not end up here")
