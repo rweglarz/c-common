@@ -190,10 +190,11 @@ def printPrismaAccessConnections(format="terminal"):
     if format=="terminal":
         print("Remote networks")
         for conn,connv in pac['remote_networks'].items():
-            print(f"{conn:20} {connv['source_ip']:16} {connv['site_state_name']:6} {connv['bgp_site_state_name']}")
+            print(f" {conn:20} {connv['source_ip']:16} {connv['site_state_name']:6} {connv['bgp_site_state_name']}")
+        print()
         print("Service connections")
         for conn,connv in pac['service_connections'].items():
-            print(f"{conn:20} {connv['source_ip']:16} {connv['site_state_name']:6} {connv['bgp_site_state_name']}")
+            print(f" {conn:20} {connv['source_ip']:16} {connv['site_state_name']:6} {connv['bgp_site_state_name']}")
         return
     if format=="json":
         jo = {
