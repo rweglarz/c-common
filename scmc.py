@@ -440,19 +440,11 @@ class MScm(Scm):
 
 
 def main():
-    if os.getenv("SCM_CLIENT_ID") is not None:
-        base_params['client_id']     = os.getenv("SCM_CLIENT_ID")
-        base_params['client_secret'] = os.getenv("SCM_CLIENT_SECRET")
-        base_params['tsg_id']        = os.getenv("SCM_TSG_ID")
-        base_params['region']        = os.getenv("PA_REGION")
-        base_params['tsg_v2']        = os.getenv("SCM_TSG_V2", False)
-    else:
-        readConfiguration()
-
     parser = argparse.ArgumentParser(
         description='useful actions on scm'
     )
     # parser.add_argument('--all', action='store_true')
+    parser.add_argument('--scm-creds', nargs='?', action='store')
     parser.add_argument('--job', nargs='?', action='store')
     parser.add_argument('--name', nargs='?', action='store')
     parser.add_argument('--format', nargs='?', action='store')
@@ -462,6 +454,17 @@ def main():
     parser.add_argument('--all-admins', action='store_true')
     parser.add_argument('cmd')
     args = parser.parse_args()
+
+    if os.getenv("SCM_CLIENT_ID") is not None:
+        base_params['client_id']     = os.getenv("SCM_CLIENT_ID")
+        base_params['client_secret'] = os.getenv("SCM_CLIENT_SECRET")
+        base_params['tsg_id']        = os.getenv("SCM_TSG_ID")
+        base_params['region']        = os.getenv("PA_REGION")
+        base_params['tsg_v2']        = os.getenv("SCM_TSG_V2", False)
+    else:
+        readConfiguration(args.scm_creds)
+    print("tsg:{} client_id:{}".format(base_params['tsg_id'], base_params["client_id"]))
+
 
     global scm_client
     scm_client = MScm(
