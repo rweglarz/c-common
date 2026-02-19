@@ -444,7 +444,12 @@ class MScm(Scm):
                 if j['last_seen']!=check_number:
                     jsv = scm_client.get_job_status(jid)
                     jobs_status[jid]['js'] = jsv.data[0]
-                status_strings.append(f"{jid} {j['js'].result_str}")
+                dn_map = {
+                    "Remote Networks": " (RN)",
+                    "Service Connections": " (SC)"
+                }
+                dn = dn_map.get(j['device_name'], "")
+                status_strings.append(f"{jid}{dn} {j['js'].result_str}")
                 if j['js'].result_str=="PEND":
                     pending_tasks_count += 1
                 if j['js'].result_str=="FAIL":
