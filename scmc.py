@@ -213,6 +213,45 @@ def printPrismaAccessConnections(format="terminal"):
 
 
 
+def getPrismaAccessLocationsInsights():
+    headers = {
+        "X-PANW-Region": base_params['region']
+    }
+    path = f"/insights/v3.0/resource/query/locations/location_summary"
+    data = {
+        "filter": {
+            "operator": "AND",
+            "rules": [
+                {
+                    "property": "event_time",
+                    "operator": "last_n_hours",
+                    "values": [
+                        1
+                    ]
+                },
+            ]
+        }
+    }
+    rj = scm_client.post(endpoint=path, headers=headers, json=data)
+    print(rj)
+
+def getPrismaAccessLocations():
+    headers = {
+        "X-PANW-Region": base_params['region']
+    }
+    path = f"/sse/config/v1/locations"
+    rj = scm_client.get(endpoint=path, headers=headers)
+    # print(rj)
+    for r in rj:
+        # print(r)
+        print(f"{r.get('value'):20} {r.get('display'):22} {r.get('continent'):15} {r.get('region'):25} {r.get('aggregate_region'):15}")
+        #{'value': 'slovakia', 'display': 'Slovakia', 'continent': 'Europe', 'latitude': 49.04924, 'longitude': 17.10699, 'region': 'europe-west3', 'aggregate_region': 'europe-central'}
+
+
+def printPrismaAccessLocations(format="terminal"):
+    # pac = getPrismaAccessLocationsInsights()
+    pac = getPrismaAccessLocations()
+
 
 
 class MScm(Scm):
@@ -489,6 +528,10 @@ def main():
 
     if args.cmd == "get-prisma-access-connections":
         printPrismaAccessConnections(format=args.format)
+        sys.exit(0)
+
+    if args.cmd == "get-prisma-access-locations":
+        printPrismaAccessLocations(format=args.format)
         sys.exit(0)
 
     folders = []
