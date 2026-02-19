@@ -488,6 +488,7 @@ def main():
     parser.add_argument('--name', nargs='?', action='store')
     parser.add_argument('--format', nargs='?', action='store')
     parser.add_argument('--rn', action='store_true')
+    parser.add_argument('--sc', action='store_true')
     parser.add_argument('--mu', action='store_true')
     parser.add_argument('--folders', nargs='?', action='store')
     parser.add_argument('--all-admins', action='store_true')
@@ -540,6 +541,8 @@ def main():
             folders.append(f)
     if args.rn:
         folders.append("Remote Networks")
+    if args.sc:
+        folders.append("Service Connections")
     if args.mu:
         folders.append("Mobile Users")
 
